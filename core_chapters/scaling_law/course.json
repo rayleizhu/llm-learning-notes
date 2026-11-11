@@ -1,0 +1,12 @@
+{
+  "$schema": "../../scripts/course.schema.json",
+  "title": "Scaling Law · 大模型预训练的规模法则",
+  "description": "资源规模与损失的关系，以及固定算力预算下的最优分配。",
+  "order": 10,
+  "published": true,
+  "entry": "index.html",
+  "supplements": [
+    { "title": "公式推导与适用边界", "path": "notes.html" }
+  ],
+  "extra_files": ["fonts/OFL.txt"]
+}

@@ -1,0 +1,6 @@
+.playwright-cli
+.codebuddy/
+_site/
+_site-tmp-*/
+__pycache__/
+*.pyc

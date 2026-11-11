@@ -1,0 +1,1566 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepSeek-V4.1 深度解读：模型架构与关键技术</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<style>
+:root{
+  --bg:#0b0f17; --bg2:#111827; --card:#141b2b; --card2:#1a2336; --line:#26324a;
+  --text:#e6ebf5; --muted:#93a0b8; --dim:#6b7892;
+  --blue:#4f8cff; --cyan:#2dd4bf; --violet:#a78bfa; --amber:#fbbf24; --rose:#fb7185; --green:#34d399; --orange:#fb923c;
+  --swa:#64748b; --full:#4f8cff; --reindex:#a78bfa; --reuse:#2dd4bf;
+  --radius:14px; --shadow:0 10px 30px rgba(0,0,0,.35);
+}
+[data-theme="light"]{
+  --bg:#f6f8fc; --bg2:#ffffff; --card:#ffffff; --card2:#f1f4fa; --line:#dfe5f0;
+  --text:#18202f; --muted:#56627a; --dim:#8590a6; --shadow:0 8px 24px rgba(30,40,70,.08);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font:15.5px/1.75 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;}
+a{color:var(--blue);text-decoration:none} a:hover{text-decoration:underline}
+code,.mono{font-family:"JetBrains Mono","SFMono-Regular",Consolas,monospace;font-size:.88em}
+code{background:var(--card2);border:1px solid var(--line);padding:1px 6px;border-radius:6px}
+
+/* layout */
+.layout{display:grid;grid-template-columns:270px 1fr;min-height:100vh}
+aside{position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--line);background:var(--bg2);padding:22px 16px}
+aside .brand{font-weight:800;font-size:17px;letter-spacing:.3px;margin-bottom:4px}
+aside .brand span{background:linear-gradient(90deg,var(--blue),var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent}
+aside .sub{color:var(--dim);font-size:12px;margin-bottom:18px}
+aside nav a{display:block;color:var(--muted);padding:5px 10px;border-radius:8px;font-size:13.5px;line-height:1.5}
+aside nav a:hover{background:var(--card2);color:var(--text);text-decoration:none}
+aside nav a.active{background:rgba(79,140,255,.14);color:var(--blue);font-weight:600}
+aside nav .grp{margin:16px 0 6px 10px;font-size:11.5px;letter-spacing:1.5px;color:var(--dim);text-transform:uppercase;font-weight:700}
+aside nav a.l2{padding-left:22px;font-size:13px}
+.theme-btn{margin-top:18px;width:100%;padding:8px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer;font-size:13px}
+main{max-width:1080px;padding:0 48px 120px;margin:0 auto;width:100%}
+
+/* hero */
+.hero{padding:64px 0 34px;border-bottom:1px solid var(--line);margin-bottom:10px}
+.tag{display:inline-block;font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin-right:6px;background:var(--card)}
+.hero h1{font-size:40px;line-height:1.2;margin:16px 0 12px;letter-spacing:-.5px}
+.hero h1 .grad{background:linear-gradient(90deg,var(--blue),var(--violet) 50%,var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p.lead{color:var(--muted);font-size:17px;max-width:860px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:28px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow)}
+.kpi .v{font-size:26px;font-weight:800;letter-spacing:-.5px}
+.kpi .k{color:var(--muted);font-size:12.5px}
+.kpi.b .v{color:var(--blue)} .kpi.c .v{color:var(--cyan)} .kpi.v_ .v{color:var(--violet)} .kpi.a .v{color:var(--amber)}
+
+/* sections */
+section{padding:46px 0 10px;scroll-margin-top:10px}
+.part{margin-top:56px;padding:22px 26px;border-radius:var(--radius);background:linear-gradient(135deg,rgba(79,140,255,.16),rgba(45,212,191,.08));border:1px solid var(--line)}
+.part h2{margin:0;font-size:26px} .part p{margin:6px 0 0;color:var(--muted)}
+h2.sec{font-size:26px;margin:0 0 6px;letter-spacing:-.3px}
+h2.sec .num{color:var(--blue);margin-right:10px;font-weight:800}
+.sec-sub{color:var(--muted);margin:0 0 20px}
+h3{font-size:18.5px;margin:28px 0 10px}
+h4{font-size:15.5px;margin:18px 0 6px;color:var(--text)}
+p{margin:10px 0}
+.muted{color:var(--muted)} .small{font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow);margin:14px 0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.callout{border-left:4px solid var(--blue);background:var(--card2);padding:12px 16px;border-radius:0 10px 10px 0;margin:14px 0}
+.callout.warn{border-color:var(--amber)} .callout.ok{border-color:var(--green)} .callout.rose{border-color:var(--rose)}
+.callout b.t{display:block;margin-bottom:2px}
+ul,ol{padding-left:22px;margin:8px 0} li{margin:3px 0}
+.pill{display:inline-block;padding:1px 9px;border-radius:999px;font-size:12px;font-weight:700;color:#0b0f17}
+.p-swa{background:var(--swa);color:#fff}.p-full{background:var(--full);color:#fff}.p-reindex{background:var(--reindex)}.p-reuse{background:var(--reuse)}
+.p-amber{background:var(--amber)} .p-rose{background:var(--rose)} .p-green{background:var(--green)}
+
+/* tables */
+.tbl-wrap{overflow-x:auto;margin:12px 0;border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;font-size:13.8px;background:var(--card)}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{background:var(--card2);font-weight:700;color:var(--muted);font-size:12.5px;letter-spacing:.3px}
+tr:last-child td{border-bottom:none}
+td.hl{color:var(--cyan);font-weight:700}
+td.best{color:var(--amber);font-weight:800}
+td.wrap,th.wrap{white-space:normal}
+.num-r td:not(:first-child),.num-r th:not(:first-child){text-align:right}
+
+/* layer map */
+.layermap{display:grid;grid-template-columns:repeat(20,1fr);gap:4px;margin:10px 0 4px}
+.lyr{height:46px;border-radius:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;cursor:pointer;position:relative;transition:transform .12s, box-shadow .12s;color:#0b0f17;user-select:none}
+.lyr:hover{transform:translateY(-2px);box-shadow:0 6px 14px rgba(0,0,0,.35)}
+.lyr.sel{outline:2px solid var(--text);outline-offset:1px}
+.lyr.m-SWA{background:var(--swa);color:#fff}.lyr.m-Full{background:var(--full);color:#fff}.lyr.m-Reindex{background:var(--reindex)}.lyr.m-Reuse{background:var(--reuse)}
+.lyr .badge{position:absolute;top:-7px;right:-4px;font-size:9px;background:var(--amber);color:#111;border-radius:6px;padding:0 4px;line-height:14px}
+.lyr .badge.ds{background:var(--rose);color:#fff}
+.lyr .badge.cp{background:var(--orange);color:#111;left:-4px;right:auto}
+.lm-row-label{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:12px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--muted);margin:10px 0}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+#layerInfo{min-height:120px}
+.kv{display:grid;grid-template-columns:140px 1fr;gap:4px 12px;font-size:13.8px}
+.kv div:nth-child(odd){color:var(--muted)}
+
+/* controls */
+.ctrl{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:10px 0}
+input[type=range]{flex:1;min-width:200px;accent-color:var(--blue)}
+.out{font-weight:800;color:var(--cyan);font-variant-numeric:tabular-nums}
+.bar-row{display:grid;grid-template-columns:150px 1fr 120px;gap:10px;align-items:center;margin:7px 0;font-size:13.5px}
+.bar{height:18px;border-radius:6px;background:var(--card2);overflow:hidden;border:1px solid var(--line)}
+.bar>span{display:block;height:100%;border-radius:6px;transition:width .35s}
+.tabs{display:flex;gap:6px;margin:10px 0;flex-wrap:wrap}
+.tabs button{padding:6px 14px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--muted);cursor:pointer;font-size:13px}
+.tabs button.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+.tabpane{display:none}.tabpane.on{display:block}
+
+/* svg diagrams */
+svg text{font-family:inherit}
+.diagram{width:100%;height:auto;display:block}
+.flow{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;margin:12px 0}
+.flow .st{flex:1;min-width:150px;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:13.2px;position:relative}
+.flow .st b{display:block;color:var(--cyan);font-size:12.5px;margin-bottom:3px}
+.flow .arrow{align-self:center;color:var(--dim);font-size:18px}
+details{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:8px 14px;margin:10px 0}
+details summary{cursor:pointer;font-weight:600;color:var(--muted)}
+pre{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow-x:auto;font-size:12.8px;line-height:1.6}
+/* notes: trigger + tooltip + drawer */
+.note{border-bottom:1.5px dashed var(--amber);cursor:pointer;position:relative;transition:background .15s}
+.note:hover{background:rgba(251,191,36,.12)}
+.note::after{content:"i";display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;margin-left:4px;border-radius:50%;background:var(--amber);color:#111;font-size:10.5px;font-weight:800;font-style:italic;vertical-align:2px;font-family:Georgia,serif}
+.note .tip{position:absolute;left:0;bottom:calc(100% + 10px);width:320px;max-width:80vw;padding:10px 12px;border-radius:10px;background:var(--card2);border:1px solid var(--amber);box-shadow:var(--shadow);color:var(--text);font-size:12.8px;font-weight:400;line-height:1.6;opacity:0;pointer-events:none;transform:translateY(4px);transition:opacity .15s,transform .15s;z-index:30;white-space:normal}
+.note .tip em{display:block;margin-top:4px;color:var(--amber);font-style:normal;font-size:12px}
+.note:hover .tip,.note:focus-visible .tip{opacity:1;transform:none}
+body:has(.note:hover) .note:not(:hover) .tip{opacity:0;transform:translateY(4px)}
+.mask{position:fixed;inset:0;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .25s;z-index:40}
+.mask.on{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;height:100vh;width:min(560px,94vw);background:var(--bg2);border-left:1px solid var(--line);box-shadow:-12px 0 40px rgba(0,0,0,.4);transform:translateX(100%);transition:transform .28s ease;z-index:50;display:flex;flex-direction:column}
+.drawer.on{transform:none}
+.drawer header{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid var(--line)}
+.drawer header .ttl{font-weight:800;font-size:16.5px}
+.drawer header .lbl{font-size:11px;letter-spacing:1.5px;color:var(--amber);font-weight:700;display:block}
+.drawer .x{border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:16px}
+.drawer .body{overflow-y:auto;padding:6px 22px 40px;font-size:14.5px}
+.drawer .body h4{color:var(--cyan)}
+.drawer .body .bar-row{grid-template-columns:110px 1fr 110px}
+.source-links{margin:14px 0;padding:10px 14px;border:1px solid var(--line);border-left:3px solid var(--blue);border-radius:8px;background:var(--card2);font-size:12.5px;overflow-wrap:anywhere}
+.source-links .source-title{font-weight:700;color:var(--muted)}
+.source-links ul{list-style:none;margin:5px 0;padding:0}
+.source-links li{margin:5px 0}
+.source-links a{display:inline-block;max-width:100%}
+.source-links a:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
+.source-links code{white-space:normal;overflow-wrap:anywhere}
+.source-links p{margin:6px 0 0;color:var(--muted);font-size:12px}
+.foot{margin-top:60px;padding-top:20px;border-top:1px solid var(--line);color:var(--dim);font-size:13px}
+@media (max-width:1000px){.layout{grid-template-columns:1fr}aside{position:relative;height:auto}main{padding:0 18px 80px}.kpis{grid-template-columns:repeat(2,1fr)}.grid2,.grid3{grid-template-columns:1fr}.layermap{grid-template-columns:repeat(10,1fr)}}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside>
+  <div class="sub"><a href="../../index.html">← 教程总目录</a></div>
+  <div class="brand"><span>DeepSeek-V4.1</span> 解读</div>
+  <div class="sub">Pushing the Limits of KV Cache Compression</div>
+  <nav id="toc">
+    <a href="#overview">总览与核心数字</a>
+    <a href="#motivation">设计动机：为什么是 KV Cache</a>
+    <div class="grp">Part I · 模型架构</div>
+    <a href="#arch-map">1. 40 层结构全景</a>
+    <a href="#ced">2. Causal Encoder-Decoder</a>
+    <a href="#csa2">3. CSA2 跨层复用</a>
+    <a href="#hsi" class="l2">3.x 分层稀疏索引器</a>
+    <a href="#kvbudget">4. 890 B/token 的由来</a>
+    <a href="#fp4">5. FP4 Main KV</a>
+    <a href="#replay">6. SWA Bounded Replay</a>
+    <a href="#mhc">7. Single-Pass mHC</a>
+    <a href="#engram">8. Engram 条件记忆</a>
+    <a href="#dspark">9. DSpark 投机解码</a>
+    <a href="#moe">10. MoE 与多模态</a>
+    <a href="#hparams">11. 完整超参表</a>
+    <div class="grp">Part II · 架构之外</div>
+    <a href="#optim">12. 优化器</a>
+    <a href="#pretrain">13. 预训练数据与日程</a>
+    <a href="#infra">14. 训练与推理系统</a>
+    <a href="#posttrain">15. 后训练：数据即一切</a>
+    <a href="#dsec">16. DSec 沙箱平台</a>
+    <a href="#effort">17. 可控推理强度</a>
+    <a href="#asyncrl">18. 异步 RL 与 OPD</a>
+    <a href="#multiagent">19. 多 Agent 协作</a>
+    <a href="#eval">20. 评测结果</a>
+    <a href="#limits">21. 局限与思考</a>
+  </nav>
+  <button class="theme-btn" id="themeBtn">切换 亮 / 暗 主题</button>
+</aside>
+
+<main>
+<!-- ============ HERO ============ -->
+<header class="hero" id="overview">
+  <span class="tag">2026-09 发布</span><span class="tag">MIT License</span><span class="tag">技术报告 51 页</span><span class="tag">原生多模态</span>
+  <h1><span class="grad">DeepSeek-V4.1-Flash</span><br>把 KV Cache 压到极限的非对称 MoE</h1>
+  <p class="lead">V4.1 从头训练，不是 V4 的续训。它的核心问题是：<b><span class="note" data-note="input-heavy" tabindex="0">长程 Agent 的负载以输入为主<span class="tip">两个原因：① 单轮内，工具返回（文件、日志、搜索结果）远长于模型发出的 tool call；② 跨轮次，历史每轮都要被重新读取，累计输入随轮数按平方增长。<em>点击查看完整解释与交互计算 →</em></span></span></b>，上下文要反复 prefill、存储和搬运。为此，V4.1 在架构（CED + CSA2）、缓存精度（FP4）和部署策略（SWA Bounded Replay）三个层面一起优化。后训练算法维持不变，所有投入都放在数据与环境上。</p>
+  <div class="kpis">
+    <div class="kpi b"><div class="v">552B</div><div class="k">主干参数（另含 196B Engram）</div></div>
+    <div class="kpi c"><div class="v">8B / 16B</div><div class="k">激活参数：Prefill / Decode</div></div>
+    <div class="kpi v_"><div class="v">890 B</div><div class="k">每 token 全局 KV（≈ V4-Flash 的 1/4）</div></div>
+    <div class="kpi a"><div class="v">1/8</div><div class="k">持久化 KV 占用（相对 V4-Flash）</div></div>
+    <div class="kpi c"><div class="v">1M</div><div class="k">上下文长度</div></div>
+    <div class="kpi b"><div class="v">45T</div><div class="k">多模态预训练 token（文本:多模态 = 7:1）</div></div>
+    <div class="kpi a"><div class="v">40+</div><div class="k">OPD 教师模型数量</div></div>
+    <div class="kpi v_"><div class="v">×437</div><div class="k">相对 DeepSeek-V1 的每 token KV 缩减</div></div>
+  </div>
+  <p class="small muted" style="margin-top:18px">资料来源：DeepSeek-V4.1 技术报告（<code>DeepSeek_V41_Tech_Report.pdf</code>）、Hugging Face 模型卡与 <code>config.json</code>。凡是本文自行推导或估算的内容，都标注为「推导」或「示意」。</p>
+  <p class="small muted">各节「源码阅读」可直接跳到函数行号。模型源码固定于 <a href="https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash/tree/314113f8a7dadb388215396ba5fbee2c610a04d6/inference" target="_blank" rel="noopener noreferrer">官方推理参考实现 · 314113f8</a>（2026-11-10 核对），不代表完整训练或生产调度；GitHub 组件链接为仓库入口。</p>
+</header>
+
+<!-- ============ MOTIVATION ============ -->
+<section id="motivation">
+  <h2 class="sec">设计动机：瓶颈从「算」转向「存与搬」</h2>
+  <p class="sec-sub">经过 V3.2（DSA）和 V4（CSA/HCA）两代稀疏注意力，长序列的计算成本已经大幅下降。剩下的主要瓶颈是 KV Cache 的容量和带宽。</p>
+  <div class="grid3">
+    <div class="card"><h4>① Prefill 计算</h4><p class="small muted"><span class="note" data-note="input-heavy" tabindex="0">Agent 每次工具调用都会把整段上下文重新送回模型<span class="tip">有前缀缓存时，旧历史不必重算，但要从 SSD / host 内存加载回 HBM；新增的工具结果每轮都要 prefill；缓存被淘汰或前缀被改写时，就要大段重算。<em>点击查看完整解释 →</em></span></span>。KV 缓存未命中时，prefill 成本很高。</p><p class="small"><b>对策：</b>CED，让 prompt 只经过前 20 层。</p></div>
+    <div class="card"><h4>② HBM 运行时 KV</h4><p class="small muted">SWA 的 KV 有上界，长序列下全局 KV 占主导。它决定单卡能并发多少个请求。</p><p class="small"><b>对策：</b>CSA2 跨层共享 + FP4。</p></div>
+    <div class="card"><h4>③ SSD 持久化 KV</h4><p class="small muted">前缀复用需要把 KV 持久化。V4 中 SWA KV 占了持久化容量的近一半，但它只在几分钟内会被复用。</p><p class="small"><b>对策：</b>SWA Bounded Replay + 两级缓存。</p></div>
+  </div>
+  <div class="callout"><b class="t">一个视角转换</b>报告把 DeepSeek-V4 看作「<b>以 SWA 做局部处理的主干，再叠加一个压缩的全局上下文分支</b>」。因此 V4.1 的思路是：<b>局部 SWA 基本不动，集中精简全局分支</b>。全局 KV 在层间尽量共享，局部计算仍保留逐层的深度。</div>
+</section>
+
+<!-- ============ PART I ============ -->
+<div class="part"><h2>Part I · 模型架构</h2><p>CED、CSA2、FP4 KV、Bounded Replay、Single-Pass mHC、Engram、DSpark、多模态 MoE</p></div>
+
+<section id="arch-map">
+  <h2 class="sec"><span class="num">01</span>40 层结构全景（可交互）</h2>
+  <p class="sec-sub">点击任意一层查看配置。层号从 1 开始计数，数据取自 <code>config.json</code> 的 <code>compress_ratios</code>、<code>kv_source_layer_ids</code> 和 <code>index_source_layer_ids</code>。</p>
+  <div class="card">
+    <div class="legend">
+      <span><i style="background:var(--swa)"></i>纯 SWA</span>
+      <span><i style="background:var(--full)"></i>CSA2 · Full（生成全局 KV + 索引）</span>
+      <span><i style="background:var(--reindex)"></i>CSA2 · Reindex（复用 KV，重新选 Top-K）</span>
+      <span><i style="background:var(--reuse)"></i>CSA2 · Reuse（复用 KV + 索引）</span>
+      <span><i style="background:var(--amber)"></i>E = Engram</span>
+      <span><i style="background:var(--orange)"></i>P = <span class="note" data-note="candidate-pool" role="button" tabindex="0">候选池构建<span class="tip">L21 先为当前 query 划定搜索范围，后续 Reindex 层从中重新选 Top-512。<em>点击查看如何构建、共享与使用 →</em></span></span></span>
+      <span><i style="background:var(--rose)"></i>D = DSpark 取特征</span>
+    </div>
+    <div class="lm-row-label"><span><b>Causal Encoder</b>（L1–L20）· 压缩率 m=2 · prefill 只走这里</span><span>8B 激活</span></div>
+    <div class="layermap" id="lmEnc"></div>
+    <div class="lm-row-label"><span><b>Decoder</b>（L21–L40）· 压缩率 m=1 · 全局 KV 由 L20 输出投影</span><span>decode 共 16B 激活</span></div>
+    <div class="layermap" id="lmDec"></div>
+    <div class="card" id="layerInfo" style="margin-top:16px;background:var(--card2);box-shadow:none"></div>
+  </div>
+  <div class="grid3">
+    <div class="card"><div class="kpi" style="border:none;box-shadow:none;padding:0"><div class="v" style="color:var(--full)">4 层</div><div class="k">生成独立全局 KV（L3, L9, L15, L21）</div></div></div>
+    <div class="card"><div class="kpi" style="border:none;box-shadow:none;padding:0"><div class="v" style="color:var(--reindex)">4 层</div><div class="k">重新索引（L25, L29, L33, L37）</div></div></div>
+    <div class="card"><div class="kpi" style="border:none;box-shadow:none;padding:0"><div class="v" style="color:var(--reuse)">30 层</div><div class="k">直接复用 KV 与 Top-K 索引</div></div></div>
+  </div>
+  <p class="small muted">所有层（包括 Reuse 层）都保留自己的 <b>Query</b> 和 <b><span class="note" data-note="global-vs-swa" tabindex="0">SWA KV<span class="tip">每个 CSA2 层的注意力有两个 KV 来源：跨层共享的全局 KV（远处、稀疏）和本层私有的 SWA KV（最近 128 个 token、稠密）。复用的只是全局分支。<em>点击查看详解 →</em></span></span></b>（窗口 128）。每层都是 MoE FFN（1 共享专家 + 384 路由专家，Top-6），层间残差使用 Single-Pass mHC（4 条残差流）。</p>
+</section>
+
+<!-- CED -->
+<section id="ced">
+  <h2 class="sec"><span class="num">02</span>Causal Encoder-Decoder（CED）</h2>
+  <p class="sec-sub">这里的 encoder 也是因果的，和 T5 那种双向 encoder 不同。CED 的直接前身是 YoCo（You Only Cache Once, 2024）。<span class="note" data-note="ced" tabindex="0">CED 完整解读<span class="tip">40 层分成上下两半，长 prompt 只经过下面 20 层；上面 20 层的全局 KV 直接从第 20 层输出投影得到，局部 SWA 仍逐层计算并通过回放补齐。<em>点击查看结构、公式、回放、计算量、与 YoCo 的关系和代价 →</em></span></span></p>
+
+  <svg class="diagram" viewBox="0 0 960 330" id="cedSvg">
+    <defs>
+      <marker id="ar" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#93a0b8"/></marker>
+      <linearGradient id="gEnc" x1="0" x2="1"><stop offset="0" stop-color="#4f8cff" stop-opacity=".9"/><stop offset="1" stop-color="#4f8cff" stop-opacity=".55"/></linearGradient>
+      <linearGradient id="gDec" x1="0" x2="1"><stop offset="0" stop-color="#2dd4bf" stop-opacity=".9"/><stop offset="1" stop-color="#2dd4bf" stop-opacity=".55"/></linearGradient>
+    </defs>
+    <!-- prompt tokens -->
+    <text x="20" y="30" fill="currentColor" font-size="14" font-weight="700">Prefill（长 prompt，N 个 token）</text>
+    <rect x="20" y="45" width="300" height="34" rx="8" fill="#64748b" opacity=".35"/>
+    <text x="170" y="67" text-anchor="middle" fill="currentColor" font-size="13">prompt tokens  x₁ … x_N</text>
+    <line x1="170" y1="80" x2="170" y2="108" stroke="#93a0b8" stroke-width="2" marker-end="url(#ar)"/>
+    <rect x="20" y="110" width="300" height="70" rx="10" fill="url(#gEnc)"/>
+    <text x="170" y="140" text-anchor="middle" fill="#fff" font-size="15" font-weight="700">Causal Encoder · 20 层</text>
+    <text x="170" y="162" text-anchor="middle" fill="#fff" font-size="12">全局 KV(L3/9/15) + 逐层 SWA KV</text>
+    <line x1="320" y1="145" x2="420" y2="145" stroke="#93a0b8" stroke-width="2" marker-end="url(#ar)"/>
+    <text x="370" y="135" text-anchor="middle" fill="currentColor" font-size="12">H₂₀（L/2）</text>
+    <rect x="425" y="110" width="200" height="70" rx="10" fill="none" stroke="#a78bfa" stroke-width="2" stroke-dasharray="6 4"/>
+    <text x="525" y="138" text-anchor="middle" fill="#a78bfa" font-size="13.5" font-weight="700">逐层投影 W_l^KV, W_l^Z</text>
+    <text x="525" y="160" text-anchor="middle" fill="currentColor" font-size="12">→ Decoder 全局 KV（m=1）</text>
+    <text x="525" y="205" text-anchor="middle" style="fill:var(--rose)" font-size="12.5" font-weight="700">✓ N 个 token 无需经过 decoder</text>
+    <!-- decoder replay -->
+    <rect x="660" y="110" width="280" height="70" rx="10" fill="url(#gDec)"/>
+    <text x="800" y="138" text-anchor="middle" fill="#0b0f17" font-size="15" font-weight="700">Decoder · 20 层</text>
+    <text x="800" y="160" text-anchor="middle" fill="#0b0f17" font-size="12">只回放最后 n_win=128 个 token</text>
+    <line x1="625" y1="145" x2="658" y2="145" stroke="#93a0b8" stroke-width="2" marker-end="url(#ar)"/>
+    <text x="800" y="205" text-anchor="middle" fill="currentColor" font-size="12">生成 decoder 逐层 SWA KV（Decoder Bounded Replay）</text>
+    <!-- decode -->
+    <text x="20" y="252" fill="currentColor" font-size="14" font-weight="700">Decode（逐 token 生成）</text>
+    <rect x="20" y="268" width="900" height="40" rx="10" fill="#fbbf24" opacity=".18" stroke="#fbbf24"/>
+    <text x="470" y="293" text-anchor="middle" fill="currentColor" font-size="13">新 token 依次经过 Encoder 20 层 → Decoder 20 层（共 40 层，激活 16B），读取共享全局 KV + 本层 SWA KV</text>
+  </svg>
+
+  <h3>核心公式</h3>
+  <p>标准 Transformer 中，第 \(l\) 层的 KV 来自该层隐状态 \(H_l\)。CED 的 decoder 层（\(l &gt; L/2\)）的<b>全局 KV 直接从 encoder 最后一层的隐状态投影</b>得到，各层使用独立的投影权重：</p>
+  \[ C_l = H_{L/2}\,W^{KV}_l,\qquad Z_l = H_{L/2}\,W^{Z}_l,\qquad l &gt; L/2 \]
+  <p>\(C\) 是 KV 条目，\(Z\) 是对应的压缩权重。和 CSA2 结合后，实际只有 decoder 的第一个 Full 层（L21）执行这次投影，后续层复用结果。</p>
+  <p><b>全局 KV 就绪，不等于 decoder 局部状态就绪。</b>L21 的 SWA KV 来自 encoder 输出，L22 的来自 L21 输出，依此类推。Bounded Replay 让最后 128 个位置经过 decoder，补出近似 SWA KV，并得到预测下一个 token 所需的末尾输出。<span class="note" data-note="ced" tabindex="0">为什么不精确回放约 2560 个位置？<span class="tip">可以精确重建，但保留 encoder 输出不等于完成计算：仍要执行 decoder 的注意力与 MoE。长输入时额外开销占比不大，小增量请求中则可能占主导。<em>点击查看状态依赖与成本对比 →</em></span></span></p>
+  \[ \mathcal{O}(NL)\;\longrightarrow\;\mathcal{O}\!\left(\tfrac{NL}{2} + n_{\text{win}}\cdot\tfrac{L}{2}\right)\;\approx\;\mathcal{O}\!\left(\tfrac{NL}{2}\right)\quad (N\gg n_{\text{win}}) \]
+
+  <div class="card">
+    <h4>交互：首次 prefill，无前缀缓存（按 token·layer 估算）</h4>
+    <div class="ctrl"><span>完整 prompt 长度 N =</span><input type="range" id="nSlider" min="7" max="20" step="0.1" value="14"><span class="out" id="nOut"></span></div>
+    <div class="bar-row"><span>标准 decoder-only</span><div class="bar"><span id="bStd" style="background:var(--rose);width:100%"></span></div><span class="mono" id="vStd"></span></div>
+    <div class="bar-row"><span>CED + Bounded Replay</span><div class="bar"><span id="bCed" style="background:var(--cyan)"></span></div><span class="mono" id="vCed"></span></div>
+    <div class="bar-row"><span>CED + 精确 SWA 重建</span><div class="bar"><span id="bExact" style="background:var(--amber)"></span></div><span class="mono" id="vExact"></span></div>
+    <p class="small muted" id="cedNote"></p>
+  </div>
+  <div class="callout ok"><b class="t">为什么适合 Agent？</b>Agent 负载里，<span class="note" data-note="input-heavy" tabindex="0">工具结果和代码文件的输入量远大于输出量<span class="tip">设每轮新增 Δ 个 token、输出 o 个、共 T 轮，累计输入与输出之比约为 TΔ/2o。例如 100 轮、Δ=5K、o=500 时约为 500 : 1。<em>点击查看完整解释与交互计算 →</em></span></span>。CED 的收益集中在「读输入」这一阶段：prefill 每 token 只激活 8B，几乎减半。decode 仍走完整的 40 层，生成质量的计算深度没有缩水。</div>
+</section>
+
+<!-- CSA2 -->
+<section id="csa2">
+  <h2 class="sec"><span class="num">03</span>Compressed Sparse Attention 2（CSA2）</h2>
+  <p class="sec-sub">V4 使用 CSA + HCA 混合结构，V4.1 统一为纯 CSA2。CSA2 同时在三个可以相乘的维度上压缩。</p>
+  <div class="grid3">
+    <div class="card"><h4>条目大小</h4><p class="small muted">MLA 风格：所有 head 共享一个 512 维 latent（<code>num_key_value_heads=1</code>，<code>head_dim=512</code>），再加上 FP4 存储。</p></div>
+    <div class="card"><h4>序列维度</h4><p class="small muted">每 \(m\) 个 token 压成一个条目：encoder 用 \(m=2\)，decoder 用 \(m=1\)（不压缩）。</p></div>
+    <div class="card"><h4>层维度（新）</h4><p class="small muted">跨层共享 main KV / indexer K，并复用 Top-K 索引。<b>KV 共享和索引复用是解耦的</b>，可以分别配置。</p></div>
+  </div>
+
+  <h3>三种静态分配的模式</h3>
+  <p class="small">先区分两套 KV：每个 CSA2 层的注意力同时读 <b>全局 KV</b>（覆盖全部历史，压缩 + 稀疏，可跨层共享）和 <b>SWA KV</b>（最近 128 个 token，每层私有）。下表三种模式的区别<b>只在全局分支</b>上，SWA 分支在所有模式下都由本层自己计算。<span class="note" data-note="global-vs-swa" tabindex="0">两者的区别与配合<span class="tip">同一个 Query 对「Top-512 个全局条目 + 128 个 SWA 条目」拼接后做一次注意力：全局分支负责远距离检索，SWA 分支保证紧邻上下文逐 token 精确可见。<em>点击查看图示与对比表 →</em></span></span></p>
+  <div class="tbl-wrap"><table>
+    <tr><th>模式</th><th>Main KV &amp; Indexer K</th><th>Top-K 索引</th><th>本层仍然计算</th><th>开销</th></tr>
+    <tr><td><span class="pill p-full">Full</span></td><td>本层生成；indexer K 由 main KV 投影</td><td>本层 indexer 全量打分</td><td>全局 Q、SWA KV、indexer Q、注意力</td><td>最重</td></tr>
+    <tr><td><span class="pill p-reindex">Reindex</span></td><td>复用最近的 Full 层</td><td>用本层 indexer Q <b>重新打分</b>，选出新 Top-K</td><td>全局 Q、SWA KV、indexer Q、注意力</td><td>中</td></tr>
+    <tr><td><span class="pill p-reuse">Reuse</span></td><td>复用最近的 Full 层</td><td>复用最近一次的 Top-K</td><td>全局 Q、SWA KV、注意力</td><td>最轻（prefill 15 个 kernel，decode 11 个）</td></tr>
+  </table></div>
+  <div class="callout"><b class="t">Reindex 是关键</b>多层共享同一份 KV 时，深层 query 仍然可以<b>重新决定读哪些位置</b>。这样既节省 KV 存储，又保留了「不同深度关注不同内容」的能力。相关工作 IndexCache 只复用索引，不省 KV；YOIO 全网络共享路由，会损失性能；HySparse 仍保留稠密层。报告指出，这些方法都没有同时覆盖三个维度。</div>
+
+  <h3>压缩器与索引器的简化</h3>
+  <ul>
+    <li><b>去掉重叠：</b>V4 的 CSA 用 \(2m\) 个原始条目生成一个压缩条目，相邻条目的来源互相重叠。CSA2 改为每 \(m\) 个条目一组，互不重叠。</li>
+    <li><b>去掉绝对位置嵌入：</b>压缩时不再为这 \(2m\) 个条目编码绝对位置。</li>
+    <li><b>Indexer K 由 main KV 投影得到：</b>原来从 hidden state 出发的独立压缩路径被合并，状态更少，训练效率更高。</li>
+    <li>索引器配置：32 个 indexer query head，head dim 128，attention Top-K = 512。</li>
+  </ul>
+
+  <h3 id="hsi">分层稀疏索引器（Hierarchical Sparse Indexer，仅 decoder）</h3>
+  <p>复用索引后，剩下的 indexer 仍要对百万 token 全量打分。V4.1 让浅层 indexer 的结果约束深层 indexer 的搜索范围，<b>不增加任何额外状态</b>。<span class="note" data-note="indexer-training" role="button" tabindex="0">打分如何训练？<span class="tip">DSA 用主注意力分布的 KL 蒸馏训练 indexer；V4.1 没有公开具体损失，不能直接视为同一配方。<em>点击查看训练方法与证据边界 →</em></span></span></p>
+  <svg class="diagram" viewBox="0 0 960 250" id="hsiSvg"></svg>
+  <ol>
+    <li><b>L21（decoder 第一个 Full 层）</b>对全部因果可见位置打分，选出本层的 Top-512。</li>
+    <li>同时针对当前 query，把位置按每 8 个分成一个 block，block 分数取块内最大值，保留最新 block 并选出最多 2048 个 block，<span class="note" data-note="candidate-pool" role="button" tabindex="0">构建候选池<span class="tip">先划定最多 16,384 个候选位置，让后续 Reindex 层各自从中重选 Top-512。它是按 query 生成的搜索范围，不是新 KV，也不是最终注意力读取集合。<em>点击查看构建步骤与小例子 →</em></span></span>（最多 <b>16,384 个候选位置</b>，同一 query 的后续 Reindex 层共享）。</li>
+    <li>后续 <b>Reindex 层</b>（L25/29/33/37）只在候选池内打分，各自选 Top-512；<b>Reuse 层</b>沿用最近一次的 Top-512。</li>
+  </ol>
+  <div class="callout warn"><b class="t">训练感知（training-aware）</b>候选池约束<b>在后训练阶段引入</b>，训练和推理使用同样的限制。效果是：上下文从 4K 增长到 1M（256 倍）时，单 token decode FLOPs 只增加约 1/4（FLOPs 按精度加权：BF16=1、FP8=0.5、FP4=0.25）。</div>
+</section>
+
+<!-- KV budget -->
+<section id="kvbudget">
+  <h2 class="sec"><span class="num">04</span>890 bytes / token 是怎么来的？</h2>
+  <p class="sec-sub">报告只给出了总数。下面是本文根据公开超参做的<b>推导</b>，结果正好得到 890。</p>
+  <div class="tbl-wrap"><table class="num-r">
+    <tr><th>组件</th><th>每条目字节</th><th>来源层</th><th>压缩率 m</th><th>每 token 字节</th></tr>
+    <tr><td>Main KV（512 维 latent，FP4 E2M1 + 每 16 通道 1 个 E4M3 scale）</td><td>256 + 32 = 288</td><td>Encoder Full ×3（L3/9/15）</td><td>2</td><td>3 × 288 / 2 = <b>432</b></td></tr>
+    <tr><td>Main KV</td><td>288</td><td>Decoder Full ×1（L21）</td><td>1</td><td><b>288</b></td></tr>
+    <tr><td>Indexer K（128 维，MXFP4：64 B + 每 32 通道 1 个 scale = 4 B）</td><td>68</td><td>Encoder Full ×3</td><td>2</td><td>3 × 68 / 2 = <b>102</b></td></tr>
+    <tr><td>Indexer K</td><td>68</td><td>Decoder Full ×1</td><td>1</td><td><b>68</b></td></tr>
+    <tr><td colspan="4"><b>合计（全局 KV，常驻 HBM）</b></td><td class="hl">890 B</td></tr>
+  </table></div>
+  <p class="small muted">注：SWA KV（FP8，每层 128 窗口）的大小与序列长度无关，不计入上表。Reindex/Reuse 层不存储任何全局 KV。</p>
+
+  <div class="card">
+    <h4>交互：不同上下文长度下的单请求全局 KV 占用</h4>
+    <div class="ctrl"><span>上下文长度</span><input type="range" id="ctxSlider" min="12" max="20" step="0.05" value="20"><span class="out" id="ctxOut"></span></div>
+    <div class="bar-row"><span>DeepSeek-V4.1-Flash</span><div class="bar"><span id="kv41" style="background:var(--cyan)"></span></div><span class="mono" id="kv41v"></span></div>
+    <div class="bar-row"><span>DeepSeek-V4-Flash ≈4×</span><div class="bar"><span id="kv4" style="background:var(--violet)"></span></div><span class="mono" id="kv4v"></span></div>
+    <div class="bar-row"><span>持久化 · V4.1</span><div class="bar"><span id="p41" style="background:var(--green)"></span></div><span class="mono" id="p41v"></span></div>
+    <div class="bar-row"><span>持久化 · V4-Flash ≈8×</span><div class="bar"><span id="p4" style="background:var(--rose)"></span></div><span class="mono" id="p4v"></span></div>
+    <p class="small muted" id="kvNote"></p>
+  </div>
+</section>
+
+<!-- FP4 -->
+<section id="fp4">
+  <h2 class="sec"><span class="num">05</span>FP4 Main KV Cache</h2>
+  <div class="grid2">
+    <div class="card">
+      <h4>格式选择</h4>
+      <ul class="small">
+        <li><b>Main KV：</b>E2M1，每 16 个通道配 1 个 E4M3 scale（NVFP4 的局部分组方式），<b>省掉二级全局 scale</b>。平均每个值约 4.5 bit。</li>
+        <li><b>Indexer Q/K：</b>沿用 V4 的 OCP 标准 MXFP4，追求硬件兼容性，用来加速索引计算。</li>
+        <li><b>SWA KV：</b>对量化更敏感，<b>保留 FP8</b>。</li>
+        <li>Main KV 在 attention 之前反量化，所以不需要硬件原生支持这种格式的矩阵乘。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>为什么可以省掉全局 scale？</h4>
+      <p class="small">该格式能表示的最大幅值为 \(448\times 6 = 2688\)。训练得到的 RMSNorm 权重幅值最大约为 1，所以 RMSNorm 之后 512 维 latent 的 L2 范数不超过 \(\sqrt{512}\)。RoPE 保持范数不变，因此单通道绝对值不超过约 \(\sqrt{512}\approx 22.6\)。训练中实际观测到的最大值约为 10，<b>离溢出还很远</b>。</p>
+    </div>
+  </div>
+  <div class="callout"><b class="t">量化位置：RoPE 之后</b>RoPE 部分和非 RoPE 部分使用同一格式。在 RoPE 之前量化只有边际精度收益，却会增加 decode 开销。QAT 在<b>后训练阶段</b>引入。和 V4 的 FP8 main KV 相比，FP4 让 HBM 和 SSD 上的存储都接近减半。</div>
+</section>
+
+<!-- Replay -->
+<section id="replay">
+  <h2 class="sec"><span class="num">06</span>SWA Bounded Replay 与两级缓存</h2>
+  <p class="sec-sub"><b>回放是补算已有位置的局部状态，不是重新生成文字。</b>SWA 的依赖逐层向前扩展，精确重建的回溯范围约随「层数 × 窗口」增长；Bounded Replay 只补一个窗口，将 SWA 截断在片段内，用近似状态换取有界成本。全局分支仍可读取片段外的历史。</p>
+  \[ \text{从位置 } s \text{ 开始回放时，位置 } i \text{ 的 query 只看 SWA keys} \in \big[\max(s,\, i-W+1),\; i\big] \]
+  <div class="grid2">
+    <div class="card">
+      <h4><span class="pill p-full">Encoder</span> Bounded Replay：服务于缓存恢复</h4>
+      <p class="small">适用场景：全局 KV 命中，但 encoder SWA KV 缺失。做法是回放已缓存前缀的<b>最后 128 个 token</b>，与未缓存的后缀一起处理。回放部分<b>只重新生成 SWA KV</b>，复用全局 KV，不重算也不覆盖。</p>
+      <p class="small muted">效果：前缀缓存只依赖全局 KV，SWA KV 可以彻底移出持久化缓存。</p>
+    </div>
+    <div class="card">
+      <h4><span class="pill p-reuse">Decoder</span> Bounded Replay：服务于 prefill 减半</h4>
+      <p class="small">每次 prefill 将 prompt 最后 128 个位置的 encoder 输出送进 decoder，<b>补齐近似 SWA KV，并计算用于预测下一个 token 的末尾输出</b>。这些 KV 保留用于本次 decode，但不进入前缀缓存；连续生成时正常更新，不逐 token 回放。</p>
+      <p class="small muted">后训练模拟同样的回放，让模型适应近似；不意味着恢复成完整前向的精确状态。</p>
+    </div>
+  </div>
+  <h3>两级 KV 存储</h3>
+  <div class="tbl-wrap"><table>
+    <tr><th>层级</th><th>内容</th><th>位置</th><th>生命周期</th><th>理由</th></tr>
+    <tr><td><b>持久层</b></td><td>全局 KV（main KV + indexer K）</td><td>SSD 持久化缓存</td><td>保证 ≥ 72 小时</td><td class="wrap">长尾复用，前缀可能隔很久才再次命中</td></tr>
+    <tr><td><b>短期层</b></td><td>Encoder SWA KV</td><td>分布式内存池（每台机器拿出 10% 的 host DRAM）</td><td>TTL 分钟级</td><td class="wrap">只在活跃会话的下一轮内复用，会话结束即失效</td></tr>
+  </table></div>
+  <div class="callout ok"><b class="t">1/8 是两个因子相乘的结果</b>V4 的持久化 KV 中，SWA KV 约占一半。把它移走，容量约减半（×1/2）；全局 KV 本身又缩到 1/4。两者相乘：\(\tfrac12\times\tfrac14=\tfrac18\)。V4 原本提出的 Zero SWA Caching 需要精确回放 \(L\times n_{\text{win}}\) 个 token，在生产中太贵。Bounded Replay 把一次严重的缓存未命中变成了代价很低的近似恢复。</div>
+</section>
+
+<!-- mHC -->
+<section id="mhc">
+  <h2 class="sec"><span class="num">07</span>Single-Pass mHC</h2>
+  <p class="sec-sub">mHC（Manifold-constrained Hyper-Connections）在相邻 block 之间维护 \(n\) 条残差流。V4.1 中 \(n=4\)，Sinkhorn-Knopp 迭代 20 次。</p>
+  \[ X_{l+1} = B_l X_l + C_l\,\mathcal{F}_l(A_l X_l),\qquad (A_l,B_l,C_l)=\mathcal{H}(X_l) \]
+  <p>问题在于：输入混合 \(A_lX_l\) 必须等 \(\mathcal{H}(X_l)\) 对整个隐藏维度完成归约之后才能开始，所以残差数据要读两遍。Single-Pass mHC 只改了<b>一个下标</b>：</p>
+  \[ X_{l+1} = B_l X_l + C_l\,\mathcal{F}_l(\color{#fb7185}{A_{l-1}}X_l),\qquad (A_l,B_l,C_l)=\mathcal{H}(X_l) \]
+  <p>当前 block 使用<b>上一个 block 预测的输入混合系数</b>，数据依赖随之消失。kernel 遍历 \(X_l\) 的每个 tile 时，可以同时完成输入混合，并累积下一步预测系数所需的统计量。实验中这个偏移带来的性能损失可以忽略。</p>
+  <div class="card">
+    <h4>激活读写量（\(n=4\)，单位 \(d\)）</h4>
+    <div class="bar-row"><span>V4 多 kernel 实现</span><div class="bar"><span style="width:100%;background:var(--rose)"></span></div><span class="mono">(4n+4)d = 20d</span></div>
+    <div class="bar-row"><span>两遍融合（理论）</span><div class="bar"><span style="width:70%;background:var(--amber)"></span></div><span class="mono">(3n+2)d = 14d</span></div>
+    <div class="bar-row"><span>Single-Pass + Mega-mHC</span><div class="bar"><span style="width:50%;background:var(--green)"></span></div><span class="mono">(2n+2)d = 10d</span></div>
+    <p class="small muted">\((2n+2)d\) 正是理想下界：\((n+1)d\) 次读加 \((n+1)d\) 次写。Mega-mHC 把残差更新、输入混合、系数预测、input pre-norm 和 FP8 转换融合进一个 kernel。预训练仍使用多 kernel 实现，部署时才拿到访存收益。</p>
+  </div>
+</section>
+
+<!-- Engram -->
+<section id="engram">
+  <h2 class="sec"><span class="num">08</span>Engram 条件记忆（196B）</h2>
+  <p class="sec-sub">Engram 是 DeepSeek 先前提出的模块，目标是把「记忆」和「计算」解耦：通过 n-gram 哈希查表，获取静态知识。</p>
+  <div class="grid2">
+    <div class="card">
+      <h4>配置</h4>
+      <div class="kv">
+        <div>参数量</div><div>196B，平均分给 2 个模块</div>
+        <div>插入位置</div><div>第 2、15 层（0-indexed 为 1、14），用于平衡训练流水线各 stage 的显存</div>
+        <div>N-gram 阶数</div><div>{2, 3, 4}</div>
+        <div>哈希头</div><div>每阶 8 个，每阶总嵌入维度 2048（每头 256）</div>
+        <div>表大小</div><div>每个头约 16M 项，表长取互不相同的素数</div>
+        <div>精度</div><div>嵌入表与 K/V 投影均为 FP8</div>
+        <div>Tokenizer 压缩</div><div>129,280 → 99,092（<code>engram_compressed_vocab_size</code>）</div>
+      </div>
+      <p class="small muted">核对（推导）：\(2\times3\times8\times16\text{M}\times256\approx196.6\text{B}\) ✓</p>
+    </div>
+    <div class="card">
+      <h4>相对原版 Engram 的改动</h4>
+      <ul class="small">
+        <li><b>去掉 short causal convolution</b>：在 DeepSeek 的推理栈里，它带来的收益抵不上增加的复杂度。</li>
+        <li><b>换优化器</b>：嵌入表改用「动量 + Sinkhorn balancing」更新（见第 12 节），只需一个动量缓冲。学习率是主干的 5 倍。</li>
+      </ul>
+      <h4>部署特性</h4>
+      <ul class="small">
+        <li>查表地址只取决于输入 token，<b>可以提前确定</b>，因此推理时通过后台 RDMA 从 host 内存预取，与计算重叠。第一个模块的预取与第一个 Transformer block 的计算重叠。</li>
+        <li>RL rollout 期间，Engram 表常驻 GPU，避免 host 内存碎片导致 OOM。</li>
+        <li>社区实测（SGLang）：把 Engram 表 offload 到 host，可让 KV 容量提升 36%，吞吐基本不变。</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- DSpark -->
+<section id="dspark">
+  <h2 class="sec"><span class="num">09</span>DSpark 投机解码（取代 MTP）</h2>
+  <p class="sec-sub">V4.1 在主干预训练中<b>不再使用 MTP 模块</b>，改用后训练阶段单独训练的 DSpark：半自回归起草 + 置信度调度验证。</p>
+  <div class="flow">
+    <div class="st"><b>输入特征</b>取主干 L38–L40 的 attention input（<code>dspark_target_layer_ids</code>）</div><div class="arrow">→</div>
+    <div class="st"><b>Drafter</b>3 个 Transformer block，SWA 窗口 128，MoE（128 路由专家，Top-3）</div><div class="arrow">→</div>
+    <div class="st"><b>并行起草</b>一次前向同时输出 5 个草稿位置的 base logits</div><div class="arrow">→</div>
+    <div class="st"><b>Markov head</b>低秩（rank 256）建模草稿 token 之间的依赖</div><div class="arrow">→</div>
+    <div class="st"><b>Confidence head + 调度器</b>预测逐位置接受率，推算前缀存活概率，再结合引擎吞吐曲线和当前负载，动态决定验证长度</div>
+  </div>
+  <div class="callout"><b class="t">训练方式与 V3 的 MTP 不同</b>V3 的 MTP 在整个预训练中与主干联合训练。DSpark 则是：① 预训练结束后<b>冻结主干，只训练 DSpark</b>；② 后训练期间与主干同步更新，但<b>梯度在主干处截断</b>。这样它能跟上策略的变化，同时加速在线服务、RL rollout 和 OPD 采样。</div>
+</section>
+
+<!-- MoE & multimodal -->
+<section id="moe">
+  <h2 class="sec"><span class="num">10</span>MoE 与原生多模态</h2>
+  <div class="grid2">
+    <div class="card">
+      <h4>DeepSeekMoE（每层都是 MoE）</h4>
+      <ul class="small">
+        <li>1 个共享专家 + 384 个路由专家，每 token 激活 6 个；专家中间维度 2304</li>
+        <li>门控打分函数 <code>sqrtsoftplus</code>，Top-K 归一化，<code>routed_scaling_factor=1.5</code></li>
+        <li>SwiGLU，并在阈值 10 处 clamp（<code>swiglu_limit=10</code>）</li>
+        <li>路由专家权重原生 FP4（<code>expert_dtype: fp4</code>），其余为 FP8 block-scaled（32×32）</li>
+        <li><b>按模态分开的无辅助损失负载均衡</b>：图像和文本各维护一套专家 correction bias，并独立更新（速度 0.001）。偏置只用于选专家，输出加权仍使用原始路由分数。另保留权重为 1e-4 的序列级均衡损失。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>DeepSeek-ViT（从零训练）</h4>
+      <ul class="small">
+        <li>32 层，隐藏维 1024，16 个头，patch 14，FFN 2816</li>
+        <li>2D-RoPE 代替绝对位置编码，支持可变分辨率</li>
+        <li>patch embedding 的卷积换成线性投影，<b>以兼容 Muon</b>；使用 RMSNorm + SwiGLU</li>
+        <li>3×3 pixel-unshuffle，视觉 token 数降为 1/9；2 层 MLP projector（隐藏维 5120）</li>
+        <li>分辨率范围 544² 到 1344²。1344/14=96，再除以 3 得 32，所以单图最多 32×32 = <b>1024 个 token</b></li>
+      </ul>
+    </div>
+  </div>
+  <h3>ViT 训练的两个阶段</h3>
+  <div class="flow">
+    <div class="st"><b>阶段 1 · 对比学习</b>约 47B 图文对（alt-text），SigLIP sigmoid loss，分辨率上限 224²。更高分辨率对最终模型帮助很小。</div><div class="arrow">→</div>
+    <div class="st"><b>阶段 2 · 自回归微调</b>接一个 4B MoE LLM，在 236B token（caption / alt text / 图表 / OCR）上做 NTP，分辨率 544²–1344²；结束后丢弃这个 LLM</div><div class="arrow">→</div>
+    <div class="st"><b>接入主干预训练</b>学习率衰减前 ViT 冻结，只训练最后的 norm 和 projector；28T 开始衰减时，以较小学习率解冻并联合训练</div>
+  </div>
+</section>
+
+<!-- hparams -->
+<section id="hparams">
+  <h2 class="sec"><span class="num">11</span>完整超参速查</h2>
+  <div class="tbl-wrap"><table>
+    <tr><th>类别</th><th>参数</th><th>值</th></tr>
+    <tr><td rowspan="5">主干</td><td>层数 / 隐藏维</td><td>40（20 enc + 20 dec） / 5120</td></tr>
+    <tr><td>词表</td><td>129,280</td></tr>
+    <tr><td>位置编码</td><td>RoPE θ=10000，rope dim 64；YaRN factor 16（64K → 1M）；压缩分支 θ=160000</td></tr>
+    <tr><td>mHC</td><td>扩展系数 4，Sinkhorn 迭代 20</td></tr>
+    <tr><td>总参数（safetensors）</td><td>≈763B（552B 主干 + 196B Engram + ViT / DSpark 等）</td></tr>
+    <tr><td rowspan="6">注意力</td><td>Query heads / head dim</td><td>64 / 512；KV head 1（共享 latent）</td></tr>
+    <tr><td>Q 低秩 / O 低秩</td><td>q_lora_rank 1280；输出投影 8 组，每组中间维 1024</td></tr>
+    <tr><td>SWA 窗口</td><td>128（所有层）</td></tr>
+    <tr><td>Indexer</td><td>32 heads × 128 dim，Top-K = 512</td></tr>
+    <tr><td>候选池</td><td>2048 blocks × 8 = 16,384 positions（由 L21 构建）</td></tr>
+    <tr><td>压缩率</td><td>L1–2：无全局分支；L3–20：m=2；L21–40：m=1</td></tr>
+    <tr><td rowspan="2">MoE</td><td>专家</td><td>1 shared + 384 routed，Top-6，中间维 2304</td></tr>
+    <tr><td>激活参数</td><td>prefill 8B / decode 16B</td></tr>
+    <tr><td>Engram</td><td>层 / 规模</td><td>L2、L15；2×98B；n-gram 2–4；8 heads × 256</td></tr>
+    <tr><td>DSpark</td><td>结构</td><td>3 blocks；5 个草稿位置；Markov rank 256；128 experts / Top-3</td></tr>
+    <tr><td>Vision</td><td>ViT</td><td>32L / 1024 / 16 heads / patch 14；最多 1024 个图像 token</td></tr>
+  </table></div>
+</section>
+
+<!-- ============ PART II ============ -->
+<div class="part"><h2>Part II · 架构之外的关键技术</h2><p>优化器、数据、训练与推理系统、后训练数据工程、沙箱平台、推理强度控制、异步 RL、多 Agent</p></div>
+
+<section id="optim">
+  <h2 class="sec"><span class="num">12</span>优化器：Muon + head-wise Muon + Sinkhorn</h2>
+  <div class="tbl-wrap"><table>
+    <tr><th>参数类别</th><th>优化器</th><th>要点</th></tr>
+    <tr><td>主干线性层、Engram 投影、视觉-语言 projector</td><td><b>Muon</b></td><td class="wrap">Nesterov 动量 0.95，解耦 weight decay 0.1；每个更新矩阵的 RMS 缩放到 0.18，以便沿用 AdamW 的学习率</td></tr>
+    <tr><td>Q / K 权重</td><td><b>head-wise Muon</b></td><td class="wrap">按 head 切分后再做正交化。把 Muon 看作预条件梯度下降，原版 Muon 让所有 head 共用一个预条件器，head-wise 版本则每个 head 各用一个，更能适应 head 之间的异质性（GLM-5、Kimi-K3 也验证过）</td></tr>
+    <tr><td>Engram 表、token embedding、prediction head</td><td><b>动量 + Sinkhorn balancing</b></td><td class="wrap">流程与 Muon 相同，只是把 Newton-Schulz 换成行列交替归一化（K=11 次）。只需一个动量缓冲（Adam 需要两个状态），实验中效果也优于 Adam</td></tr>
+    <tr><td>RMSNorm 权重、bias、scale 等</td><td><b>AdamW</b></td><td class="wrap">β=(0.9, 0.95)，ε=1e-20，wd=0.1（bias 和 scale 不做 decay）</td></tr>
+  </table></div>
+  <p>Sinkhorn balancing 寻找对角缩放矩阵 \(D_r, D_c\)，让更新矩阵的行 RMS 和列 RMS 都近似为 1：</p>
+  \[ \Delta_t = \sqrt{n}\,D_r\,\widehat{G}_t\,D_c,\qquad \tfrac1n\textstyle\sum_j(\Delta_t)_{ij}^2\approx1,\quad \tfrac1m\sum_i(\Delta_t)_{ij}^2\approx1 \]
+  <details><summary>算法 1：带 Sinkhorn balancing 的动量更新（展开）</summary>
+<pre>M_t   ← β·M_{t-1} + (1-β)·G_t
+Ĝ_t   ← β·M_t + (1-β)·G_t                 # Nesterov
+ρ_i   ← ||Ĝ_t[i,:]||₂ ;  ρ̄ ← mean(ρ)
+U⁽⁰⁾  ← Ĝ_t ;  U⁽⁰⁾[i,:] ← 0  if ρ_i ≤ τ·ρ̄   # 屏蔽近零行 (τ=1e-3)
+for k = 1..K (K=11，奇数):
+    odd  k: 每一行除以自身 L2 范数        # 行 = 一个 token / n-gram
+    even k: 每一列除以自身 L2 范数        # 列 = 一个隐藏特征
+Δ_t   ← √n · U⁽ᴷ⁾                         # 单位行范数 → 单位行 RMS
+W_{t+1} ← W_t − γ·η_t·Δ_t                 # γ = 0.18，对齐 Adam 的更新幅度</pre>
+  </details>
+  <div class="callout"><b class="t">直觉</b>嵌入类矩阵天然具有「token × 特征」的二维结构，行列交替归一化正好利用了这种结构。Engram 有 196B 参数，用 Adam 的话两份状态的显存开销很大，省掉一份影响显著。</div>
+</section>
+
+<section id="pretrain">
+  <h2 class="sec"><span class="num">13</span>预训练：数据与日程</h2>
+  <div class="grid2">
+    <div class="card">
+      <h4>文本数据：关注「信息增量」</h4>
+      <ul class="small">
+        <li>弱模型生成的内容和低质量机翻被视为<b>隐性重复</b>（implicit duplication）并过滤，因为它们只是改写已有信息，长期训练下可能有害</li>
+        <li>按模型规模和数据量设计 scaling ladder，逐级校准数据配比</li>
+        <li>引入更多领域专家，构建细粒度的质量维度；探索 model-in-the-loop 数据迭代</li>
+        <li>加入更新的代码：新开源仓库、commit、库和框架</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>多模态数据：成本递增的漏斗</h4>
+      <ul class="small">
+        <li>发现爬虫偏向纯文本页面，于是从 Common Crawl <b>重新引导抓取</b></li>
+        <li>不做大规模合成，优先清洗、使用原生的 web 数据</li>
+        <li>交错图文流程：启发式与统计过滤 → 去重 → 质量模型（以上都在下载图片之前）→ 组装序列 → 图像感知的过滤与去重 → SmolVLM 严格打分 → 淘汰文档部分回收为图文对</li>
+        <li>领域数据：grounding/pointing、OCR、长尾知识、图像-代码对、computer-use 轨迹</li>
+      </ul>
+    </div>
+  </div>
+  <p class="small">数据整合：文本与多模态管线中重合的样本，优先保留多模态版本，epoch 数取两者中的较大值。最终<b>文本 : 多模态 = 7 : 1</b>。超长文档预先确定性切分，改进后的 best-fit packing 让 padding 率 ≤ 1e-4。</p>
+
+  <h3>训练日程（45T tokens，batch 固定为 100.6M tokens/step，全程无不稳定）</h3>
+  <svg class="diagram" viewBox="0 0 960 260" id="lrSvg"></svg>
+  <ul class="small">
+    <li>稀疏注意力<b>从零开始</b>以 64K 序列长度训练，<b>没有任何稠密注意力预热</b></li>
+    <li>累计 34T 时扩展到 1M 上下文，之后还训练了 11T</li>
+    <li>学习率：前 2000 步线性预热 → 2.6e-4 保持到 28T → 28T–40T cosine 衰减到 2.6e-5 → 40T–45T 保持</li>
+    <li>每条样本使用独立的 attention mask（sample-level masking）</li>
+  </ul>
+  <div class="callout ok"><b class="t">基座效果</b>V4.1-Flash-Base 的总参数约为 V4-Pro-Base 的 1/3，激活参数约 1/4，世界知识、推理和代码能力与之相当，内部 held-out 集（内部文档 / 代码库 / 学术材料）的 BPB 全部最低（报告称提升 5%–10%）。V4-Pro 仍然领先的项目集中在知识容量上：SimpleQA 55.2 vs 42.3，以及 MultiLoKo、LongBench-V2。</div>
+</section>
+
+<section id="infra">
+  <h2 class="sec"><span class="num">14</span>训练与推理系统</h2>
+  <h3>训练侧</h3>
+  <div class="grid2">
+    <div class="card">
+      <h4>多模态训练</h4>
+      <ul class="small">
+        <li><b>编码器分离执行</b>：每个 step 分三段，依次是 ViT 前向、LLM 前向+反向、ViT 反向。LLM 阶段不掺视觉计算，沿用纯文本的并行策略</li>
+        <li><b>对比学习的通信重叠</b>：视觉特征的 all-gather 与文本前向重叠，文本特征的 all-gather 与文本反向重叠</li>
+        <li><b>均衡图片切分</b>：同一条长序列的图片分摊到各 CP rank，每张图只读一次。不阻塞计算的条件是 \(\rho &lt; \tfrac{B_{IO}}{B_{GPU}}C\)，与序列长度无关</li>
+        <li>RL rollout 增量传输图片；CPU 侧的解码和预处理结果缓存到分布式文件系统</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>CSA2 跨 stage 共享</h4>
+      <ul class="small">
+        <li><b>Shadow indexer</b>：在每个参与共享的 stage 放一个轻量副本，参数只有一个逻辑 owner，负责优化和 checkpoint</li>
+        <li><b>Pipeline payload 扩展</b>：跨 stage 需要的表示、索引和梯度并入现有的 P2P 通信，按 CP 分片</li>
+        <li><b>Micro-batch 级共享状态管理</b>：状态在前向、重计算、反向之间保持可用，最后一个消费者用完后立即释放</li>
+        <li><b>Engram 并行</b>：按行分片，优化器状态在副本间分摊；整批 embedding 预取、梯度回传与 ViT 计算重叠；FP8 存储与读取</li>
+      </ul>
+    </div>
+  </div>
+  <h3>推理侧</h3>
+  <div class="flow">
+    <div class="st"><b>EPD 分离</b>视觉 Encoding / Prefill / Decode 三段独立扩缩、重叠执行</div>
+    <div class="st"><b>Kernel 融合</b>FlashMLA（RoPE-attn-RoPE-cast）、DeepGEMM（Mega-Gate / Mega-mHC / Mega-MoE）、TileKernels、DeepSelect（TopK）</div>
+    <div class="st"><b>15 / 11 个 kernel</b>占绝大多数的 Reuse 层，prefill 只需 15 次 kernel 启动，decode 只需 11 次</div>
+    <div class="st"><b>两级 KV + 回放</b>SSD 全局 KV（≥72h）+ DRAM 池 SWA KV（分钟级 TTL）+ Encoder / Decoder Bounded Replay</div>
+  </div>
+</section>
+
+<section id="posttrain">
+  <h2 class="sec"><span class="num">15</span>后训练：算法不变，数据即一切</h2>
+  <div class="callout rose"><b class="t">报告原话（意译）</b>「在当前阶段，工程化数据与环境管线的边际回报，远超后训练算法创新的边际回报。」流程沿用 SFT → RL → OPD，没有任何算法修改。</div>
+  <h3>任务 = (problem, environment, verification system) 三元组</h3>
+  <p>从<b>难度</b>（不能太简单）和<b>正确性</b>（三部分都没有致命缺陷）两个维度评估任务，并用这两个信号作为奖励，<b>迭代训练「出题模型」</b>。任务在整个生命周期内都受监控：每次进入新的 RL 运行，产生的轨迹都会成为重新审计质量的证据。</p>
+  <div class="tabs" id="ptTabs"><button class="on" data-t="pt1">Coding Agent 环境</button><button data-t="pt2">General Agent 环境</button><button data-t="pt3">多 Harness RL 与模型合并</button></div>
+  <div class="tabpane on" id="pt1">
+    <p class="small">数据来源：① 内部员工和合作伙伴的 coding-agent 会话（保留复杂或模型表现差的任务，按轨迹去重）；② 达到 star 门槛的 GitHub 仓库。</p>
+    <div class="flow">
+      <div class="st"><b>① 选题 Agent</b>判断能否在容器中构建、运行和自动验证；选定轮次或 commit 作为起点；设计 fail-to-pass 与 pass-to-pass 评测点</div><div class="arrow">→</div>
+      <div class="st"><b>② 搭建 Agent</b>安装依赖、准备工作目录、测试和任务描述；自测；<b>清理泄露答案的痕迹</b>；打包成新镜像层</div><div class="arrow">→</div>
+      <div class="st"><b>③ 多个解题 Agent</b>尝试完成任务</div><div class="arrow">→</div>
+      <div class="st"><b>④ 独立质检 Agent</b>审查环境问题、事实错误、评测点与题意是否错位、是否可被 hack</div><div class="arrow">→</div>
+      <div class="st"><b>⑤ 修复 Agent</b>修复问题，调整过易或过难的评测点，重新进入验证</div>
+    </div>
+  </div>
+  <div class="tabpane" id="pt2">
+    <ul class="small">
+      <li>鼓励内部员工和外部合作伙伴把最新模型用到日常工作中，并自愿回传交互数据和反馈</li>
+      <li>根据回传数据中出现的接口，构造大量 <b>mocked tools</b>，复现输入格式、输出结构、API schema 和行为约束，覆盖常见 SaaS、企业应用和专门的业务后端</li>
+      <li>大规模收集员工提交的负反馈和失败案例，重建工具上下文、交互模式和失败条件，生成单轮或多轮环境，<b>针对已观察到的弱点做 RL</b></li>
+    </ul>
+  </div>
+  <div class="tabpane" id="pt3">
+    <ul class="small">
+      <li>RL 在两个维度上扩展：<b>训练算力</b>和 <b>scaffold 数量</b>（Claude Code 的多个版本、OpenCode、Pi、DeepSeek Harness 的 Standard / PTC 模式等）</li>
+      <li>rollout 拆成 <b>agent sandbox</b>（运行 harness 和工具）和 <b>worker container</b>（与 scaffold 无关的控制层，把异构交互统一成同一种轨迹格式）</li>
+      <li>两者都运行在 DSec 上，独立于可被抢占的 GPU 训练池；trainer 抢占时，rollout 可以挂起并卸载，保留完整状态</li>
+      <li><b>模型合并</b>：合并不同 scaffold 或配置下的 checkpoint，用来初始化下一轮 RL。任务表现和 token 效率都进一步提升</li>
+      <li>扩展到 1M 上下文后，超长任务（如 Terminal-Bench 3.0）还能继续提升</li>
+    </ul>
+  </div>
+</section>
+
+<section id="dsec">
+  <h2 class="sec"><span class="num">16</span>DSec：百万级并发沙箱</h2>
+  <div class="grid3">
+    <div class="card"><h4>放弃 Kubernetes</h4><p class="small muted">自研放置引擎<b>用弱一致性换扩展性</b>：多个副本之间不做同步，各自根据近期测量预测资源并独立决策；节点在本地执行硬性准入检查，作为兜底。计算节点按 shard（scale unit）划分，缩小故障影响范围。</p></div>
+    <div class="card"><h4>高密度</h4><p class="small muted">sub-NUMA 分区，每个 worker VM 绑定一个 NUMA 域。单节点的并发容器数从约 1,000 提升到 <b>2,500+</b>。延迟敏感任务单独设执行类：其他任务用 <code>SCHED_IDLE</code>，再配合 core scheduling 隔离超线程。</p></div>
+    <div class="card"><h4>约束「坏」Agent</h4><p class="small muted">观察到的行为：利用 XFS 驱动权限问题、AppArmor 非法内存访问、从包镜像服务泄露答案，甚至删除关键二进制或整个文件系统。防御手段：每个沙箱单独的 AppArmor 配置 + 基于 eBPF 的网络策略。把环境弄崩的轨迹记为失败，并向 RL 回报 <b>repercussion</b> 信号。</p></div>
+  </div>
+</section>
+
+<section id="effort">
+  <h2 class="sec"><span class="num">17</span>可控推理强度（Reasoning Effort 1–100）</h2>
+  <p>在 system prompt 中加入 <code>Reasoning Effort: {effort} (range 1–100; …)</code>。训练时对同一个 prompt \(x\) 在多个 effort 档位 \(b\) 下采样，<b>同一 \((x,b)\) 的回答构成子组</b>，在子组内计算 group-relative advantage，不同 effort 之间不直接比较。effort 的差异通过长度惩罚体现：</p>
+  \[ r^{\text{len}}_{b,j} = -\min\!\Big(C_{\max},\; k(b)\,\frac{\ell_{b,j}}{L_{\text{norm}}}\Big),\qquad k(b)=k_0\exp\!\Big(-\frac{b-b_{\min}}{\tau}\Big),\;\tau=\lambda\,\Delta b \]
+  <p class="small muted">effort 每增加 \(\tau\)，惩罚系数乘以 \(e^{-1}\)。附录 C 的解释：如果额外推理带来的边际收益随长度指数衰减，那么指数形式的 \(k(b)\) 会让最优推理长度随 \(b\) 近似线性增长。</p>
+  <div class="grid2">
+    <div class="card">
+      <h4>交互：惩罚系数 \(k(b)\)（示意，参数非官方）</h4>
+      <div class="ctrl"><span>τ =</span><input type="range" id="tauSlider" min="5" max="60" step="1" value="20"><span class="out" id="tauOut"></span></div>
+      <svg class="diagram" viewBox="0 0 420 220" id="effSvg"></svg>
+    </div>
+    <div class="card">
+      <h4>报告实测（effort 25 → 100）</h4>
+      <div class="bar-row"><span>8 项推理平均</span><div class="bar"><span style="width:76.3%;background:var(--blue)"></span></div><span class="mono">67.1 → 76.3</span></div>
+      <div class="bar-row"><span>DeepSWE v1.1</span><div class="bar"><span style="width:74.2%;background:var(--cyan)"></span></div><span class="mono">66.0 → 74.2</span></div>
+      <div class="bar-row"><span>Terminal-Bench 2.1</span><div class="bar"><span style="width:90.6%;background:var(--violet)"></span></div><span class="mono">82.4 → 90.6</span></div>
+      <div class="bar-row"><span>MathArena Apex</span><div class="bar"><span style="width:65.6%;background:var(--amber)"></span></div><span class="mono">25.3 → 65.6</span></div>
+      <p class="small">代价：输出 token 约 <b>×2.5</b>。收益集中在前段：effort 60–80 就能拿回最高档的大部分准确率，token 用量不到一半；最后升到 100 时，Agent 轨迹变长 1.6–1.8 倍，只换来边际提升。</p>
+      <div class="tbl-wrap"><table><tr><th>API 档位</th><th>low</th><th>high</th><th>max</th></tr><tr><td>effort b</td><td>50</td><td>75</td><td>100</td></tr></table></div>
+    </div>
+  </div>
+  <p class="small muted">在单轮推理上学到的 effort 控制，可以直接迁移到长程 Agent 轨迹，用来调节多轮之间的总探索量和验证量。训练只用了有限几个档位，部署时取中间值也能得到插值后的行为。</p>
+</section>
+
+<section id="asyncrl">
+  <h2 class="sec"><span class="num">18</span>异步 RL 基础设施与大规模 OPD</h2>
+  <div class="grid2">
+    <div class="card">
+      <h4>调度：sample 级派发</h4>
+      <p class="small">rollout 和训练部署在同一批 GPU 上，分时复用。报告比较了三种派发粒度：</p>
+      <ul class="small">
+        <li>✗ batch 级：训练指标剧烈振荡</li>
+        <li>✗ prompt 级：容易被 GRPO 组内的长尾样本卡住</li>
+        <li>✓ <b>sample 级</b>：新完成的样本数一旦达到下一个 prompt 的 GRPO group size，就派发该 prompt（这些样本可以来自不同组），并发度保持稳定</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>无缝中断与恢复</h4>
+      <ul class="small">
+        <li><b>token 级中断</b>：生成可以在任意 token 边界停下</li>
+        <li><b>状态持久化</b>：KV cache 和专家路由按 token 粒度保存，切换 checkpoint 后直接复用，不用重新 prefill</li>
+        <li>sample 粒度回收：样本结束即释放状态</li>
+        <li><b>concatenated routing-replay</b>：跨 checkpoint 的样本，把各段 rollout 的专家路由拼接起来，不丢弃也不重算</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>两类偏差的处理</h4>
+      <ul class="small">
+        <li><b>长度偏差</b>（短样本先返回）：按数据集限制并发；丢弃训练早期过快返回的短样本</li>
+        <li><b>Off-policy</b>：通过派发和等待逻辑限制最大 off-policy 比例；在 loss 中屏蔽过度陈旧的 token</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>40+ 教师的全词表 OPD</h4>
+      <ul class="small">
+        <li>后训练的最后阶段，覆盖所有领域</li>
+        <li>各领域的最佳教师可能来自不同开发阶段，<b>架构也可能不同</b>（与学生之间、教师之间都可能不同）</li>
+        <li>支持数量几乎不受限的异构教师，切换成本可以忽略</li>
+        <li>训练中动态调整数据配比、各数据集的并发上限和启用的教师；在异步场景下保证配置切换的一致性</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="multiagent">
+  <h2 class="sec"><span class="num">19</span>多 Agent 协作训练（初步）</h2>
+  <p>使用 DeepSeek Harness 的 <b>Agent Team</b> 模式：lead 通过 <code>spawn_teammate</code> 创建持久化的队友（fresh 模式不带历史，fork 模式带上 lead 已完成轮次的快照）。所有成员共享同一个仓库 checkout，通过持久化 mailbox（<code>send_message</code>）通信，用共享任务板管理任务归属和依赖。</p>
+  <div class="callout"><b class="t">奖励 = 任务表现 + 协作奖励 + derived-latency 惩罚</b>derived latency 的算法：把执行事件和协作依赖建成 DAG，按固定的 prefill/decode 速率把 token 折算成时间，加上实测的工具执行时间，取<b>关键路径长度</b>。这样鼓励有效的并行，惩罚不必要的串行和同步，也不受服务端排队和 batching 的干扰。</div>
+  <div class="tbl-wrap"><table class="num-r">
+    <tr><th>基准</th><th>设置</th><th>Single-Agent</th><th>Multi-Agent</th></tr>
+    <tr><td>ProgramBench（172 个 golden 任务）</td><td>8h deadline，Almost@1</td><td>20.39%</td><td class="hl">30.04%</td></tr>
+    <tr><td>FrontierSWE v2（no-GPU）</td><td>20h deadline，Mean@5</td><td>28.20%</td><td class="hl">32.90%</td></tr>
+  </table></div>
+  <p class="small muted">横轴约束的是墙钟时间；总 token 和总算力的对比报告没有给出。</p>
+</section>
+
+<section id="eval">
+  <h2 class="sec"><span class="num">20</span>评测结果</h2>
+  <div class="tabs" id="evTabs"><button class="on" data-t="ev1">Instruct（Max effort）</button><button data-t="ev2">Base 模型</button><button data-t="ev3">跨 Scaffold</button></div>
+  <div class="tabpane on" id="ev1">
+    <div class="tbl-wrap"><table class="num-r">
+      <tr><th>Benchmark</th><th>Opus-5</th><th>GPT-5.6 Sol</th><th>K3</th><th>GLM-5.3</th><th>V4-Pro</th><th>V4-Flash</th><th>V4.1-Flash</th></tr>
+      <tr><td>GPQA Diamond</td><td>93.4</td><td class="best">94.1</td><td>92.9</td><td>88.1</td><td>92.4</td><td>89.9</td><td class="hl">90.9</td></tr>
+      <tr><td>HLE</td><td class="best">56.3</td><td>44.5</td><td>43.5</td><td>42.0†</td><td>42.7†</td><td>37.8†</td><td class="hl">36.8 (39.1†)</td></tr>
+      <tr><td>Codeforces</td><td>-</td><td>-</td><td>-</td><td>-</td><td>3348</td><td>3289</td><td class="best">3471</td></tr>
+      <tr><td>MathArena Apex</td><td>-</td><td>-</td><td class="best">65.6</td><td>-</td><td>65.3</td><td>58.6</td><td class="best">65.6</td></tr>
+      <tr><td>Terminal-Bench 2.1</td><td>89.1</td><td>88.8</td><td>88.3</td><td>88.2</td><td>87.9</td><td>82.7</td><td class="best">90.6</td></tr>
+      <tr><td>Terminal-Bench 3.0</td><td class="best">43.3</td><td>34.4</td><td>17.7</td><td>28.3</td><td>11.8</td><td>7.6</td><td class="hl">30.0</td></tr>
+      <tr><td>Terminal-Bench 4.0</td><td class="best">51.8</td><td>39.9</td><td>12.6</td><td>37.9</td><td>12.4</td><td>7.0</td><td class="hl">31.2</td></tr>
+      <tr><td>DeepSWE v1.1</td><td>74.0</td><td>73.0</td><td>67.5</td><td>66.9</td><td>62.7</td><td>54.4</td><td class="best">74.2</td></tr>
+      <tr><td>ProgramBench</td><td class="best">37.0</td><td>23.0</td><td>17.5</td><td>19.0</td><td>15.5</td><td>-</td><td class="hl">20.3</td></tr>
+      <tr><td>CyberGym</td><td>-</td><td>84.5</td><td>80.0</td><td>84.5</td><td>83.3</td><td>76.7</td><td class="best">88.1</td></tr>
+      <tr><td>SEC-Bench Pro</td><td>-</td><td class="best">74.3</td><td>-</td><td>-</td><td>56.4</td><td>30.9</td><td class="hl">62.8</td></tr>
+      <tr><td>HLE w/ tools</td><td>63.6</td><td>-</td><td>59.8</td><td>62.5</td><td>60.0</td><td>51.5</td><td class="best">63.9</td></tr>
+      <tr><td>AutomationBench</td><td>50.3</td><td>45.8</td><td>46.7</td><td>48.8</td><td>43.2</td><td>37.7</td><td class="best">54.8</td></tr>
+      <tr><td>Agents' Last Exam</td><td>28.6</td><td>26.7</td><td>27.6</td><td>28.5</td><td>25.7</td><td>25.2</td><td class="best">31.8</td></tr>
+      <tr><td>Chartography w/ tools</td><td class="best">84.0</td><td>79.9</td><td>68.1</td><td>-</td><td>-</td><td>-</td><td class="hl">78.9</td></tr>
+      <tr><td>BabyVision w/ tools</td><td class="best">94.1</td><td>88.9</td><td>85.7</td><td>-</td><td>-</td><td>-</td><td class="hl">89.6</td></tr>
+    </table></div>
+    <p class="small muted">† 表示 HLE 纯文本子集。代码 Agent 类任务使用 DeepSeek Harness Minimal、1M 上下文，temperature 1.0，top-p 0.95；DeepSWE 使用 mini-SWE；视觉 Agent 使用 Claude Code、512K 上下文。</p>
+  </div>
+  <div class="tabpane" id="ev2">
+    <div class="tbl-wrap"><table class="num-r">
+      <tr><th>Benchmark</th><th>V4-Flash-Base (284B/13B)</th><th>V4-Pro-Base (1.6T/49B)</th><th>V4.1-Flash-Base (552B/8B·16B)</th></tr>
+      <tr><td>MMLU-Pro</td><td>68.3</td><td>73.5</td><td class="best">74.1</td></tr>
+      <tr><td>SimpleQA-Verified</td><td>30.1</td><td class="best">55.2</td><td>42.3</td></tr>
+      <tr><td>SuperGPQA</td><td>46.5</td><td class="best">53.9</td><td>53.1</td></tr>
+      <tr><td>HumanEval</td><td>69.5</td><td>76.8</td><td class="best">79.4</td></tr>
+      <tr><td>BigCodeBench</td><td>56.8</td><td>59.2</td><td class="best">60.6</td></tr>
+      <tr><td>GSM8K</td><td>90.8</td><td>92.6</td><td class="best">93.0</td></tr>
+      <tr><td>MATH</td><td>57.4</td><td class="best">64.5</td><td>61.1</td></tr>
+      <tr><td>LongBench-V2</td><td>44.7</td><td class="best">51.5</td><td>45.2</td></tr>
+      <tr><td>MMMU-Pro / DocVQA</td><td>-</td><td>-</td><td class="hl">56.5 / 95.6</td></tr>
+      <tr><td>CVBench / RefCOCO-avg</td><td>-</td><td>-</td><td class="hl">77.9 / 86.0</td></tr>
+    </table></div>
+  </div>
+  <div class="tabpane" id="ev3">
+    <div class="tbl-wrap"><table class="num-r">
+      <tr><th>Benchmark</th><th>Claude Code</th><th>Codex</th><th>OpenCode</th><th>Pi</th><th>mini-SWE</th><th>DSH Minimal</th><th>DSH Standard</th><th>DSH PTC</th></tr>
+      <tr><td>DeepSWE v1.1</td><td>69.8</td><td>65.6</td><td>65.5</td><td>66.2</td><td class="best">74.2</td><td>72.6</td><td>70.5</td><td>67.6</td></tr>
+      <tr><td>Terminal-Bench 2.1</td><td>88.0</td><td>84.1</td><td>85.0</td><td>86.1</td><td>90.3</td><td class="best">90.6</td><td>85.8</td><td>85.8</td></tr>
+    </table></div>
+    <p class="small muted">同一个 checkpoint 换不同 harness，DeepSWE 上相差 8.7 个百分点，Terminal-Bench 2.1 上相差 6.5 个百分点。部署时应该用自己实际使用的框架重新评测。</p>
+  </div>
+</section>
+
+<section id="limits">
+  <h2 class="sec"><span class="num">21</span>局限与思考</h2>
+  <div class="grid2">
+    <div class="card">
+      <h4>报告承认的边界</h4>
+      <ul class="small">
+        <li><b>CSA2 的选择错误</b>：L21 的候选池决定了后续层能看到哪些位置。远距离的关键信息如果没进入池子，后面的层就无法补救</li>
+        <li><b>Bounded Replay 的近似状态</b>：缓存命中的位置不同，后缀的 KV 在数学上也不同；多次暂停和恢复之后的鲁棒性有待压测</li>
+        <li><b>知识容量</b>：SimpleQA、长上下文 LongBench-V2 等仍落后于 V4-Pro</li>
+        <li><b>最难的任务</b>：Terminal-Bench 3.0/4.0、ProgramBench 上与最强闭源模型仍有明显差距</li>
+        <li>架构、语料、规模和训练量同时变化，各组件的单独收益缺少消融实验</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>值得记住的设计哲学</h4>
+      <ul class="small">
+        <li><b>按复用时间尺度分配存储</b>：全局 KV 长尾复用，放 SSD；SWA KV 只在分钟级复用，放 DRAM 并配合回放</li>
+        <li><b>用少量重算换大量存储</b>：Bounded Replay 用 128 个 token 的回放，换来 SWA KV 不再持久化</li>
+        <li><b>区分输入和输出的算力</b>：CED 让读和写使用不同的激活规模</li>
+        <li><b>训练感知的部署近似</b>：候选池、FP4 QAT、Decoder Replay 都在后训练中模拟</li>
+        <li><b>后训练的瓶颈是数据和环境</b>：任务三元组、多 Agent 出题与质检、百万级沙箱</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<div class="foot">
+  <p>参考资料：DeepSeek-AI, <i>DeepSeek-V4.1-Flash: Pushing the Limits of KV Cache Compression</i>, 2026；Hugging Face <code>deepseek-ai/DeepSeek-V4.1-Flash</code> 模型卡与 <code>config.json</code>；SGLang day-0 支持博客。</p>
+  <p>本页的 890 B 拆解、参数核对和 \(k(b)\) 曲线为作者推导或示意，以官方报告为准。</p>
+</div>
+</main>
+</div>
+
+<!-- ============ NOTE DRAWER ============ -->
+<div class="mask" id="noteMask"></div>
+<div class="drawer" id="noteDrawer" role="dialog" aria-modal="true" aria-labelledby="noteTitle">
+  <header><div><span class="lbl">补充说明</span><span class="ttl" id="noteTitle"></span></div><button class="x" id="noteClose" aria-label="关闭">✕</button></header>
+  <div class="body" id="noteBody"></div>
+</div>
+
+<template id="note-indexer-training" data-title="打分如何训练：DSA 蒸馏与 V4.1 的已知边界">
+  <div class="callout warn"><b class="t">先区分已证实与未公开</b><b>DSA 明确用主注意力分布蒸馏训练 indexer。</b>但 V4.1 的技术报告没有给出 CSA2 的索引器训练损失，不能据此断言它完全沿用 DSA 的 KL 目标。下面先解释 DSA，再说明 V4.1 能确认到哪一步。</div>
+
+  <h4>① DSA 学习的是位置打分</h4>
+  <p class="small">DSA 的 <code>Lightning Indexer</code> 用较小的 query/key 表示计算相关性分数。各头点积经过 ReLU，再由当前 query 产生的权重加权求和：</p>
+  \[ I_{t,s}=\sum_h w^I_{t,h}\,\operatorname{ReLU}\!\left(q^I_{t,h}\cdot k^I_s\right) \]
+  <p class="small">生成这些 query、key 和权重的参数需要学习。Top-K 则根据分数选出位置，不是另一个带参数的网络。</p>
+
+  <h4>② 教师是主注意力，不是外部大模型</h4>
+  <ol class="small">
+    <li>同一模型的主注意力产生各历史位置的 attention 权重。</li>
+    <li>跨 attention heads 求和，再沿位置维度归一化，得到目标分布 \(p_{t,:}\)。</li>
+    <li>Indexer 分数经过 softmax 得到预测分布 \(\hat p_{t,:}\)，用 KL 散度拟合目标：</li>
+  </ol>
+  \[ \begin{gathered} \hat p_{t,:}=\operatorname{softmax}(I_{t,:}) \\ \mathcal L_I=\sum_t D_{\mathrm{KL}}\!\left(p_{t,:}\,\middle\|\,\hat p_{t,:}\right) \end{gathered} \]
+  <p class="small">目标分布不作为被优化对象。直觉就是：<b>主注意力认为哪里重要，就教轻量 indexer 给哪里高分。</b>这是模型内部的注意力分布蒸馏，不是后训练中让外部教师提供词表概率的 OPD。</p>
+
+  <h4>③ 为什么要独立损失？DSA 分两阶段训练</h4>
+  <p class="small">硬 Top-K 返回离散位置索引，语言建模损失不能直接通过这些索引对「选谁」求导。DSA 将 indexer 输入 <code>detach</code>，让 <b>indexer 只由 KL 损失训练，主模型只由语言建模损失训练</b>。</p>
+  <div class="tbl-wrap"><table>
+    <tr><th>阶段</th><th class="wrap">主模型</th><th class="wrap">Indexer 的监督范围</th></tr>
+    <tr><td>Dense warm-up</td><td class="wrap">保留稠密注意力，冻结主模型</td><td class="wrap">对齐完整因果可见范围的注意力分布</td></tr>
+    <tr><td>Sparse training</td><td class="wrap">启用 Top-K，继续用语言建模损失训练</td><td class="wrap">只在选中的集合上对齐归一化后的注意力分布</td></tr>
+  </table></div>
+  <p class="small muted">因此 DSA 并不是全程额外计算一份稠密注意力当教师。上面的损失公式展示的是基本形式；稀疏训练阶段的分布范围限于所选集合。</p>
+
+  <h4>④ 候选池的 block 分数不需要另一个打分网络</h4>
+  <p class="small">V4.1 已公开的候选池机制直接对 L21 的 indexer 分数取块内最大值：</p>
+  \[ u_t(b)=\max_{s\in B_b,\,s\le t} I^{(21)}_{t,s} \]
+  <p class="small"><b>学习位置打分 → 按固定规则构建候选池 → 后续 Reindex 再打分并选 Top-512。</b>每块取最大值、保留最新块、选 Top-2048 都是确定的选择规则，公开机制里没有另一个独立的 block 打分网络。不能把它们称为已公开的「候选池蒸馏损失」。</p>
+
+  <h4>⑤ V4.1：哪些明确，哪些尚未披露？</h4>
+  <div class="callout ok"><b class="t">报告明确说明</b>从头使用稀疏注意力训练，没有 dense warm-up；候选池约束在后训练阶段引入，训练和推理采用相同的候选范围。后者就是这里的 <b>training-aware</b>：让深层 indexer 在实际部署的搜索范围内训练。</div>
+  <p class="small">报告没有给出以下细节：</p>
+  <ul class="small">
+    <li>CSA2 是否仍使用上述 KL 损失，以及目标分布、损失系数和梯度隔离的具体设置。</li>
+    <li>全局 KV 与 SWA 覆盖重叠时，如何从主注意力构造监督目标。</li>
+    <li>多个层共享索引时，是否聚合多个消费者层的监督信号。</li>
+  </ul>
+  <p class="small"><b>无 dense warm-up 不等于无蒸馏；training-aware 也不等于明确使用 KL。</b>DSA 是理解这一思路的参照，但不能把它的训练配方当成 V4.1 已证实的实现。</p>
+  <p class="small muted">依据：<a href="https://arxiv.org/html/2512.02556" target="_blank" rel="noopener noreferrer">DeepSeek-V3.2 §2.1.1</a>（DSA 的 dense warm-up、稀疏阶段 KL 与梯度隔离）；<a href="https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash/blob/main/DeepSeek_V41_Tech_Report.pdf" target="_blank" rel="noopener noreferrer">V4.1 技术报告 §2.3.2 及预训练设置</a>（候选池的训练感知约束与从头稀疏训练）。</p>
+</template>
+
+<template id="note-candidate-pool" data-title="构建候选池：先划搜索范围，再选 Top-512">
+  <div class="callout ok"><b class="t">一句话</b>候选池是 L21 为<b>当前 query</b>列出的一份「值得继续检索的位置名单」。后续 Reindex 层在这份名单里重新打分，各自挑出最多 512 个全局 KV 条目做注意力。<b>候选池不是最终 Top-512，也不是新生成的一套 KV。</b></div>
+  <p class="small"><span class="note" data-note="indexer-training" role="button" tabindex="0">这些打分是像 DSA 一样蒸馏训练的吗？<span class="tip">DSA 的训练损失已公开，V4.1 的具体索引器损失尚未披露。block 最大值与 Top-K 选择规则不是另一个训练模型。<em>点击查看完整补充说明 →</em></span></span></p>
+
+  <h4>① 为什么先构建候选池？</h4>
+  <p class="small">即使注意力只读取 Top-512，indexer 仍要先找到这 512 个位置。如果 L21、L25、L29、L33、L37 每次都从百万位置里重选，检索本身就很贵。分层索引让 L21 先做一次全范围筛选，给后续层留下较大的搜索范围；后续层仍可用自己的 query 改变排序，而不必再次遍历全部历史。</p>
+  <div class="flow">
+    <div class="st"><b>L21：全局检索</b>对因果可见位置打分，得到本层的 Top-512；同时构建最多 16,384 个位置的候选池。</div>
+    <div class="arrow">→</div>
+    <div class="st"><b>L25 / 29 / 33 / 37：重新排序</b>沿用同一个候选池，用各层自己的 indexer query 重新选 Top-512。</div>
+    <div class="arrow">→</div>
+    <div class="st"><b>各组 Reuse 层</b>不再打分，直接沿用最近一次选出的 Top-512。</div>
+  </div>
+
+  <h4>② L21 具体怎么构建？</h4>
+  <p class="small">对固定的 query 位置 \(t\)，令 \(s_t(j)\) 为 L21 的 indexer 给历史位置 \(j\) 的分数，候选池记为 \(\mathcal{C}_t\)。这里仅讨论 decoder，其全局 KV 压缩率 \(m=1\)，一个 KV 条目对应一个 token 位置。</p>
+  <ol class="small">
+    <li><b>先做因果约束：</b>只允许位置 \(j\le t\)，未来位置分数设为负无穷。</li>
+    <li><b>每 8 个连续位置分成一块：</b>block 0 是 0–7，block 1 是 8–15，依此类推。</li>
+    <li><b>用块内最大分数给 block 打分：</b>只要其中一个位置很相关，这块就有机会入选。</li>
+    <li><b>保留最新 block，再选高分块：</b>参考实现把包含当前最新可见位置的 block 分数设为正无穷，然后统一取最多 2048 块。最新块<b>占用这 2048 个名额之一</b>，不是额外追加。</li>
+    <li><b>把入选 block 展开为候选位置：</b>最多 \(2048\times8=16{,}384\) 个位置，后续 Reindex 层只在这些因果可见的候选中选 Top-512。</li>
+  </ol>
+  \[ \begin{gathered} B_b=\{8b,\ldots,8b+7\} \\ u_t(b)=\max_{j\in B_b,\,j\le t}s_t(j) \end{gathered} \]
+  <p class="small muted">不足 2048 个可见 block 时就全部保留。最后一块可能只部分可见；整块入选也不会取消因果掩码，\(t\) 之后的位置仍不可被读取。</p>
+  <div class="callout warn"><b class="t">这里的「8 个一块」不是 KV 压缩</b>这是给检索分组，不是把 8 个向量汇总成 1 个向量。入选后，8 个位置仍各自保留自己的 KV。它和 encoder 中 \(m=2\) 的压缩组是两件不同的事。</div>
+
+  <h4>③ 一个缩小的例子（示意，非官方参数）</h4>
+  <p class="small">假设 query 在 \(t=15\)，全部 16 个位置都因果可见；为了方便演示，每块 4 个位置，只选 2 块，最终只取 Top-2。</p>
+  <div class="tbl-wrap"><table>
+    <tr><th>block / 位置</th><th>块内最高分</th><th class="wrap">是否入候选池</th></tr>
+    <tr><td>B0 / 0–3</td><td>0.90</td><td class="wrap">入选：剩余块中分数最高</td></tr>
+    <tr><td>B1 / 4–7</td><td>0.80</td><td class="wrap">不入选</td></tr>
+    <tr><td>B2 / 8–11</td><td>0.70</td><td class="wrap">不入选</td></tr>
+    <tr><td>B3 / 12–15</td><td>0.20 → 正无穷</td><td class="wrap">入选：最新 block 强制保留</td></tr>
+  </table></div>
+  <p class="small">于是候选池是 <b>{0, 1, 2, 3, 12, 13, 14, 15}</b>，共 8 个位置，而不是两个 block 各只留下最高分的位置。L25 重新打分后可能选 <b>{2, 14}</b>，L29 则可能选 <b>{1, 13}</b>。它们使用相同的候选池，但最终关注的位置可以不同。</p>
+
+  <h4>④ 哪些东西共享，哪些不共享？</h4>
+  <div class="tbl-wrap"><table>
+    <tr><th>对象</th><th class="wrap">含义与生命周期</th></tr>
+    <tr><td>共享全局 KV</td><td class="wrap">L21 生成的历史表示，后续 decoder 层复用。某位置没入当前候选池，不代表它的 KV 被删除。</td></tr>
+    <tr><td>候选池 \(\mathcal{C}_t\)</td><td class="wrap">同一个 query 位置在后续 Reindex 层之间共享的搜索范围。不同 query、不同请求有各自的候选池，<b>不是整段对话永久使用一份名单</b>。</td></tr>
+    <tr><td>最终 Top-512</td><td class="wrap">L21 从全范围选择，供 L22–24 复用；L25/29/33/37 各自在候选池内重选，再供本组后续 3 个 Reuse 层使用。</td></tr>
+    <tr><td>SWA 窗口</td><td class="wrap">仍由本层独立提供最近 128 个位置，不受候选池筛选限制。候选池也不刻意排除 SWA 范围，两路可以重叠。</td></tr>
+  </table></div>
+  <p class="small">因此，「候选池有 16,384 个位置」<b>不等于注意力读取 16,384 条 KV</b>。通常先选最多 512 条全局 KV，再与最多 128 条本层 SWA KV 拼接做注意力。</p>
+
+  <h4>⑤ 收益、代价与实现边界</h4>
+  <ul class="small">
+    <li><b>收益：</b>后续 Reindex 的候选范围不超过 16,384。以 1M = 1,048,576 个可见位置为例，范围最多缩小到原来的 1/64。<b>这是候选数量之比，不是整个模型快 64 倍</b>；L21 仍需全范围打分。</li>
+    <li><b>取舍：</b>候选池比 512 大得多，给深层重新选择留出余地；但同一个 query 的后续 Reindex 无法经全局分支选到池外位置。下一 query 会有自己的候选池，窗口内的信息也仍有 SWA 路径。</li>
+    <li><b>存储：</b>参考实现用位置级布尔掩码表示候选池，并不复制出一套新的 KV。这是检索过程中的中间状态，不是新增的持久化 KV 缓存。</li>
+  </ul>
+  <details><summary>参考实现与高效实现的区别</summary>
+    <p class="small">公开的 <code>Indexer.forward</code> 为表达选择逻辑，先计算完整的 <code>index_score</code>，再把候选外分数屏蔽掉。它保证了候选筛选的语义，<b>但这段朴素代码本身没有省去候选外的打分乘法</b>。真正获得计算收益，需要在高效 kernel 中只对候选范围执行后续检索；不要把范围缩小直接当作这份参考代码的实测加速。</p>
+  </details>
+  <p class="small muted">参数与机制核对：<a href="https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash/blob/314113f8a7dadb388215396ba5fbee2c610a04d6/config.json#L122-L127" target="_blank" rel="noopener noreferrer"><code>config.json</code></a> 的 <code>candidate_source_layer_id=20</code>（0 起计，即 L21）、<code>candidate_block_size=8</code>、<code>candidate_topk_blocks=2048</code>、<code>index_topk=512</code>；<a href="https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash/blob/314113f8a7dadb388215396ba5fbee2c610a04d6/inference/model.py#L527-L611" target="_blank" rel="noopener noreferrer"><code>inference/model.py</code></a> 的 <code>select_candidate_blocks</code> 与 <code>Indexer.forward</code>。上面的 16 位置例子是本文示意。</p>
+</template>
+
+<template id="note-global-vs-swa" data-title="全局 KV 与 SWA KV：一层里的两套 KV">
+  <div class="callout ok"><b class="t">一句话</b>每个 CSA2 层的注意力有<b>两个 KV 来源</b>：<b>全局 KV</b> 负责「远」，覆盖全部历史，经过压缩和稀疏选择，可以跨层共享；<b>SWA KV</b> 负责「近」，只覆盖最近 128 个 token，逐 token 全部读取，每层私有。同一个 Query 对两者拼接后做<b>一次</b>注意力。Full / Reindex / Reuse 的区别只在全局分支上。</div>
+
+  <h4>① 一个 Query 实际读到了什么（可交互）</h4>
+  <div class="card">
+    <div class="tabs" id="gsTabs"><button class="on" data-m="enc-odd">Encoder · q 在奇数位（0 起）</button><button data-m="enc-even">Encoder · q 在偶数位（0 起）</button><button data-m="dec">Decoder（m=1）</button><button data-m="swa">L1–L2（纯 SWA）</button></div>
+    <svg class="diagram" viewBox="0 0 500 178" id="gsSvg"></svg>
+    <div class="legend" style="margin:4px 0"><span><i style="background:var(--blue)"></i>只来自全局（Top-K 选中）</span><span><i style="background:var(--cyan)"></i>只来自 SWA</span><span><i style="background:var(--violet)"></i>重叠：两份 KV 同时被读</span><span><i style="border:1.5px dashed var(--rose);background:transparent"></i>未完成的压缩组（全局还看不到）</span><span><i style="background:transparent;border:2px solid var(--amber)"></i>当前 Query 位置</span></div>
+    <p class="small muted" id="gsNote"></p>
+  </div>
+  <p class="small">报告图 4 的计算路径：<b>选中的 main KV（Top-512）</b> 与 <b>本层 SWA KV（128）</b> 先拼接（Concatenation），再进入同一个 Core Attention：</p>
+  \[ o_t = \mathrm{Attn}\big(q_t,\; [\,\underbrace{\mathrm{KV}^{\text{global}}_{\text{Top-}512(t)}}_{\text{远：稀疏}}\;;\;\underbrace{\mathrm{KV}^{\text{SWA}}_{t-127:t}}_{\text{近：稠密}}\,]\big) \]
+  <p class="small muted">所以每个 query 最多读约 512 + 128 = 640 个条目（其中一部分可能指向相同的 token，见下一节）。注意力计算量与上下文长度基本无关，随长度增长的只有 indexer 的打分。</p>
+
+  <h4>② 压缩的全局部分和 SWA 窗口会重叠吗？</h4>
+  <div class="callout warn"><b class="t">会重叠，而且不去重</b>报告正文没有讨论这一点。以下结论来自官方推理参考实现 <code>inference/model.py</code>（<code>Indexer.forward</code>、<code>select_candidate_blocks</code>、<code>Attention.forward</code>）。</div>
+  <p class="small"><b>1. Top-K 的可见范围不排除 SWA 窗口。</b>indexer 的唯一限制是因果性：一个压缩组<b>在 query 越过它的最后一个 token 之后</b>才可见。</p>
+  \[ \text{可见的全局条目数} = \Big\lfloor \tfrac{t+1}{m} \Big\rfloor \qquad(t\text{ 为 query 位置，从 0 计}) \]
+  <p class="small">代码里没有任何「跳过最近 128 个位置」的掩码，所以 Top-512 完全可能选中落在窗口内的条目。Decoder 的候选池（分层稀疏索引器）甚至会<b>强制保留最新的 block</b>（代码注释：「the block with this query's newest position is only partly filled, so pin it in」），而这个 block 必然落在 SWA 窗口内。</p>
+  <p class="small"><b>2. 拼接时不去重。</b><code>Attention.forward</code> 直接把两路索引拼起来送进同一个 <code>sparse_attn</code>：</p>
+<pre>kv, topk_idxs = self._window_kv(...)                 # 本层 SWA：最近 128 个
+compress_kv, compress_idxs = self._compress_kv(...)  # 全局：Top-K（共享）
+kv = torch.cat([kv, compress_kv], dim=1)
+topk_idxs = torch.cat([topk_idxs, compress_idxs], dim=-1)
+o = sparse_attn(q, kv, self.attn_sink, topk_idxs, ...)</pre>
+  <p class="small">同一个位置如果两路都选中，就会以<b>两个不同的 key</b> 出现在同一次 softmax 里。</p>
+
+  <div class="tbl-wrap"><table>
+    <tr><th>情形</th><th class="wrap">Encoder 层（m=2）</th><th class="wrap">Decoder 层（m=1）</th></tr>
+    <tr><td>窗口内的位置</td><td class="wrap">可能同时出现在 SWA 和全局 Top-K 中</td><td class="wrap">同左</td></tr>
+    <tr><td>当前 token 自己</td><td class="wrap">t 为奇数（从 0 计，组 \(\{t-1,t\}\) 已完成）时，它所在的组可能被选入全局；t 为偶数时，组 \(\{t,t+1\}\) 未完成，只在 SWA 中</td><td class="wrap">\(\lfloor (t+1)/1\rfloor = t+1\)，<b>当前 token 自己也在全局可见范围内</b>，可能同时出现在两路</td></tr>
+    <tr><td>最新的不完整组</td><td class="wrap"><b>全局看不到，只能靠 SWA</b></td><td class="wrap">不存在（每 token 一组）</td></tr>
+    <tr><td>窗口以外</td><td class="wrap" colspan="2">只能通过全局 Top-K 读取</td></tr>
+  </table></div>
+
+  <div class="callout"><b class="t">选中自己所在的组，会泄露未来信息吗？不会。</b>
+    <p class="small" style="margin:6px 0">位置从 0 计，Encoder 的组是 \(\{0,1\},\{2,3\},\dots,\{2k,2k+1\}\)。query 在奇数位 \(t=2k+1\) 时，它所在的组是 \(\{t-1,\,t\}\)，<b>只包含前一个 token 和它自己</b>，没有任何 \(t\) 之后的 token。因果注意力本来就允许 token 看到自己（对角线），所以读这个组是合法的。</p>
+    <div class="tbl-wrap" style="margin:6px 0"><table class="num-r">
+      <tr><th>query 位置 t</th><th>可见组数 \(\lfloor (t+1)/2\rfloor\)</th><th>可见的组</th><th>最新组里最大的位置</th><th>泄露？</th></tr>
+      <tr><td>0（偶）</td><td>0</td><td>—</td><td>—</td><td>否</td></tr>
+      <tr><td>1（奇）</td><td>1</td><td>{0,1}</td><td>1 = t</td><td>否</td></tr>
+      <tr><td>2（偶）</td><td>1</td><td>{0,1}</td><td>1 &lt; t</td><td>否</td></tr>
+      <tr><td>3（奇）</td><td>2</td><td>{0,1}, {2,3}</td><td>3 = t</td><td>否</td></tr>
+      <tr><td>4（偶）</td><td>2</td><td>{0,1}, {2,3}</td><td>3 &lt; t</td><td>否</td></tr>
+    </table></div>
+    <p class="small" style="margin:6px 0">一般地，只要可见组数取 \(\lfloor (t+1)/m\rfloor\)，可见组里最大的位置就是 \(m\lfloor (t+1)/m\rfloor-1\le t\)，永远不会越过当前 token。参考代码里对应 <code>compress_lens = arange(1, seqlen+1) // ratio</code>，用的正是向下取整。<b>真正会泄露的写法</b>是向上取整 \(\lceil (t+1)/m\rceil\)：偶数位 \(t=2k\) 会看到组 \(\{2k,2k+1\}\)，其中 \(2k+1\) 是未来 token。</p>
+    <p class="small muted" style="margin:6px 0">容易误读的地方：如果按 1 起计数，「奇数位」对应的组是 \(\{t,t+1\}\)，确实会包含未来 token。本页所有「奇 / 偶」都按 0 起计数。</p>
+  </div>
+
+  <p class="small"><b>3. 重叠不是重复：两份 KV 的内容不同。</b></p>
+  <ul class="small">
+    <li><b>投影不同：</b>SWA KV 来自本层 \(H_l\) 的 <code>wkv</code>；全局 KV 来自 Full 层的 Compressor（Decoder 中即 \(H_{20}\) 的投影）。</li>
+    <li><b>粒度不同：</b>Encoder 的全局条目是 2 个 token 的 softmax 加权汇总，SWA 条目是单个 token。</li>
+    <li><b>深度不同：</b>Reuse 层读到的全局 KV 来自更浅的 Full 层，SWA KV 则是本层自己的表示。</li>
+    <li><b>位置编码不同：</b>压缩条目以组内第一个 token 的位置做 RoPE，且使用单独的 <code>compress_rope_theta</code>；精度也不同（FP4 对 FP8）。</li>
+  </ul>
+  <p class="small">所以重叠的位置相当于给模型提供了同一段近处内容的<b>两种视角</b>。注意力权重如何在两者间分配，是训练出来的。</p>
+
+  <p class="small"><b>4. 为什么不去重？</b>报告没有说明，以下是推断：</p>
+  <ul class="small">
+    <li><b>实现简单。</b>去重需要按 query 动态改写 Top-K 掩码，而 Reuse 层复用的是上一层算好的索引。</li>
+    <li><b>训练和推理一致。</b>模型从预训练开始就在这种「可重叠」的设置下学习，不会形成分布错配。</li>
+    <li><b>代价很小。</b>重叠最多占 Top-512 中的少数几十个名额。在百万 token 的上下文里，这只是稀疏预算的很小一部分。</li>
+  </ul>
+
+  <p class="small"><b>5. 不重叠的那部分才是 SWA 不可替代的原因。</b>Encoder 中最新的不完整组只能由 SWA 覆盖；当前 token 自己在 Encoder 偶数位置时也只能靠 SWA。没有 SWA，模型在这些位置就会「看不见刚刚写下的内容」。</p>
+
+  <h4>③ 逐项对比</h4>
+  <div class="tbl-wrap"><table>
+    <tr><th>维度</th><th class="wrap">全局 KV（main KV + indexer K）</th><th class="wrap">SWA KV</th></tr>
+    <tr><td>覆盖范围</td><td class="wrap">全部因果可见历史（最长 1M）</td><td class="wrap">最近 128 个 token</td></tr>
+    <tr><td>粒度</td><td class="wrap">Encoder 每 2 个 token 压成 1 个条目；Decoder 每 token 1 个</td><td class="wrap">逐 token，不压缩</td></tr>
+    <tr><td>读取方式</td><td class="wrap"><b>稀疏</b>：indexer 打分，只读 Top-512</td><td class="wrap"><b>稠密</b>：窗口内全部读取</td></tr>
+    <tr><td>谁来生成</td><td class="wrap">只有 4 个 Full 层（L3/9/15/21）；Decoder 的由 \(H_{20}\) 投影</td><td class="wrap"><b>每一层</b>用本层隐状态 \(H_l\) 生成</td></tr>
+    <tr><td>跨层共享</td><td class="wrap">是：Reindex / Reuse 层复用</td><td class="wrap">否：永远每层私有</td></tr>
+    <tr><td>三种模式中</td><td class="wrap">Full 生成，Reindex / Reuse 复用</td><td class="wrap">三种模式都自己生成</td></tr>
+    <tr><td>精度</td><td class="wrap">FP4（E2M1 + 每 16 通道 1 个 E4M3 scale）</td><td class="wrap">FP8（对量化更敏感）</td></tr>
+    <tr><td>随长度增长</td><td class="wrap">线性：890 B/token</td><td class="wrap">有上界：与长度无关</td></tr>
+    <tr><td>存储与持久化</td><td class="wrap">HBM 常驻；持久化到 SSD，保留 ≥ 72h</td><td class="wrap">Encoder SWA 放 DRAM 池（分钟级 TTL）；Decoder SWA 不缓存，靠回放生成</td></tr>
+  </table></div>
+
+  <h4>④ 为什么两套都要</h4>
+  <ul class="small">
+    <li><b>压缩和稀疏会丢掉近处的细节。</b>Encoder 的全局条目把 2 个 token 压成 1 个；Top-512 按 indexer 分数挑选，不保证覆盖刚刚出现的 token。而紧邻的上下文（正在写的那行代码、刚定义的变量名）往往对下一个 token 最重要。SWA 保证这部分<b>逐 token、精确、必然可见</b>。</li>
+    <li><b>跨层共享的副作用由 SWA 弥补。</b>全局 KV 只有 4 份，30 层直接复用。如果没有 SWA，一个 Reuse 层和它复用的层读到的全局内容完全相同，只是 Query 不同。SWA KV 由本层 \(H_l\) 生成，带有该层深度的表示，保留了<b>逐层的计算深度</b>。</li>
+    <li><b>成本有界。</b>SWA 只有 128 个条目，存储和计算都与上下文长度无关，可以放心地每层都保留。</li>
+  </ul>
+  <p class="small muted">这也是报告的整体视角：V4 可以看作「以 SWA 做局部处理的主干 + 压缩的全局上下文分支」。V4.1 基本不动局部分支，集中精简全局分支。</p>
+
+  <h4>⑤ 单请求的占用：长上下文时全局 KV 占主导</h4>
+  <div class="tbl-wrap"><table class="num-r">
+    <tr><th>上下文长度</th><th>全局 KV（890 B/token）</th><th>SWA KV（40 层 × 128，估算）</th></tr>
+    <tr><td>4K</td><td>3.6 MB</td><td>≈ 2.6 MB</td></tr>
+    <tr><td>128K</td><td>117 MB</td><td>≈ 2.6 MB</td></tr>
+    <tr><td>1M</td><td>933 MB</td><td>≈ 2.6 MB</td></tr>
+  </table></div>
+  <p class="small muted">SWA 一列是本文估算，假设每个 SWA 条目与 main KV 同为 512 维、FP8 存储：40 × 128 × 512 B ≈ 2.6 MB，报告未直接给出这个数。结论与报告一致：序列足够长时，全局 KV 决定运行时的 KV 占用，所以 CSA2 和 FP4 都针对全局分支。</p>
+
+  <h4>⑥ 常见误解</h4>
+  <ul class="small">
+    <li><b>「SWA KV 是全局 KV 的一部分吗？」</b>不是。它们是两套独立的 KV，由不同的投影生成，精度不同，存储位置也不同。</li>
+    <li><b>「Reuse 层复用了 KV，为什么还有 SWA KV？」</b>复用的只是全局分支。SWA 分支在任何模式下都不复用。</li>
+    <li><b>「Decoder 的 SWA KV 也从 \(H_{20}\) 投影吗？」</b>不是。CED 只改变了<b>全局</b> KV 的来源；Decoder 的 SWA KV 仍来自本层 \(H_l\)，所以 prefill 时才需要 Decoder Bounded Replay。</li>
+    <li><b>「L1–L2 有全局 KV 吗？」</b>没有。这两层只有 SWA，只看最近 128 个 token。</li>
+    <li><b>「全局 Top-K 会自动跳过 SWA 窗口吗？」</b>不会。参考实现中两路独立选择、直接拼接，窗口内的位置可能被两路同时读取（见第 ② 节）。</li>
+  </ul>
+</template>
+
+<template id="note-ced" data-title="CED：Causal Encoder-Decoder 详解">
+  <div class="callout ok"><b class="t">一句话</b>40 层分成上下两半。长 prompt 只需经过下面 20 层；上面 20 层要用的<b>全局 KV 直接从第 20 层输出投影得到</b>，局部 SWA 仍逐层计算，用 Bounded Replay 补齐。</div>
+
+  <h4>① 基本结构</h4>
+  <div class="tbl-wrap"><table>
+    <tr><th></th><th>Causal Encoder</th><th>Decoder</th></tr>
+    <tr><td>层</td><td>L1–L20</td><td>L21–L40</td></tr>
+    <tr><td>注意力</td><td>因果</td><td>因果</td></tr>
+    <tr><td>全局 KV 来源</td><td>本层 \(H_l\)</td><td><b>\(H_{20}\) 投影</b></td></tr>
+    <tr><td>SWA KV 来源</td><td>本层 \(H_l\)</td><td>本层 \(H_l\)</td></tr>
+    <tr><td>Prefill</td><td>所有 prompt token</td><td>只回放最后 128 个</td></tr>
+    <tr><td>Decode</td><td>新 token 经过</td><td>新 token 经过</td></tr>
+  </table></div>
+  <p class="small muted">名字里的 Encoder-Decoder 和 T5 不同：T5 的 encoder 是<b>双向</b>的，只编码输入。CED 的两半<b>都是因果的</b>，生成的 token 也会依次经过两半。本质上它仍是 decoder-only 的自回归模型，只是上下两半的 KV 来源不同。</p>
+
+  <h4>② 关键改动：decoder 的全局 KV 从哪来</h4>
+  <p class="small">普通 Transformer 中，第 \(l\) 层的 KV 由该层的 \(H_l\) 算出，所以 prompt 必须走完 40 层。CED 让 decoder 层的全局 KV 直接来自 encoder 最后一层：</p>
+  \[ C_l = H_{20}\,W^{KV}_l,\qquad Z_l = H_{20}\,W^{Z}_l,\qquad l &gt; 20 \]
+  <p class="small">\(C_l\) 是 KV 条目，\(Z_l\) 是 CSA2 压缩权重。公式允许每层有自己的投影；按实际配置，只有 L21（decoder 唯一的 Full 层）执行投影，L22–L40 复用。效果是：prompt 跑完前 20 层，decoder 需要的全局记忆就已经齐了。</p>
+
+  <h4>③ 回放补的是 decoder 局部状态，不是重生成文字</h4>
+  <p class="small"><b>Encoder 算完，不等于 decoder 已准备好。</b>Encoder 输出既能直接投影成共享全局 KV，也是 L21 的输入；但各层 SWA KV 来自不同深度的表示，不能都从 encoder 输出直接投影：</p>
+  <div class="tbl-wrap"><table>
+    <tr><th>SWA KV</th><th>投影所需的输入</th></tr>
+    <tr><td>L21</td><td>Encoder 输出</td></tr>
+    <tr><td>L22</td><td>L21 的输出</td></tr>
+    <tr><td>…… L40</td><td>…… L39 的输出</td></tr>
+  </table></div>
+  <p class="small"><b>为什么只补一个窗口会有偏差？</b>假设窗口为 3，只回放位置 6、7、8：第一层计算位置 6、7 时缺少更早的邻居，输出可能偏离完整前向；第二层计算位置 8 又会读取这些有偏差的表示。<b>位置齐了，不代表这些位置的深层表示算准了。</b></p>
+  <div class="card">
+    <b class="small">交互：decoder SWA 的感受野（示意，按比例缩小）</b>
+    <div class="tabs" id="rfTabs"><button class="on" data-m="exact">精确重建</button><button data-m="bounded">Bounded Replay</button></div>
+    <svg class="diagram" viewBox="0 0 500 200" id="rfSvg"></svg>
+    <p class="small muted" id="rfNote"></p>
+  </div>
+  <p class="small"><b>Bounded Replay 的取舍：</b>只让 prompt 最后 128 个位置的 encoder 输出经过 decoder，各层 SWA 限于回放片段内，换来有界开销与近似缓存；全局 KV 仍可读取片段外的历史。回放还得到 prompt 末尾的 decoder 输出，用来预测下一个 token。它<b>不重新采样或重复输出旧文字</b>，连续生成期间也不逐 token 重放。后训练让模型适应这种近似，但不使其数学上精确。</p>
+
+  <h4>④ 精确重建可行，贵在计算而非只存输入</h4>
+  <p class="small">全局 KV 就绪时，保留约 \(128\times20=2560\) 个位置的 encoder 输出并补算 decoder，可以精确重建。只存一份 5120 维 BF16 表示约 <b>26 MB/请求</b>（不含 mHC 多残差流与其他状态）；但这不是完成了重建，<b>还要执行注意力、MoE 等逐层计算，不只是做 KV 投影</b>。</p>
+  <p class="small">按整段跑满 20 层的简单实现估算：精确回放约 <b>51,200 token·layer</b>，Bounded Replay 为 <b>2,560</b>，回放部分相差约 20 倍。<b>总请求差多少，取决于新增输入有多长。</b></p>
+  <div class="card">
+    <b class="small">交互：长历史已缓存，本轮新增 N 个 token</b>
+    <p class="small muted">假设历史足够长、所需 encoder 输出已保留，CED 的 decoder SWA 需重建；标准结构的历史 KV 已命中。这里只算 encoder 增量与 decoder 回放，不含状态搬运。</p>
+    <div class="ctrl"><span>N =</span><input type="range" id="cedN" min="5" max="17" step="0.1" value="9"><span class="out" id="cedNv"></span></div>
+    <div class="bar-row"><span>标准结构</span><div class="bar"><span id="cb1" style="background:var(--rose)"></span></div><span class="mono" id="cv1"></span></div>
+    <div class="bar-row"><span>CED + Bounded</span><div class="bar"><span id="cb2" style="background:var(--cyan)"></span></div><span class="mono" id="cv2"></span></div>
+    <div class="bar-row"><span>CED + 精确重建</span><div class="bar"><span id="cb3" style="background:var(--amber)"></span></div><span class="mono" id="cv3"></span></div>
+    <p class="small muted" id="cedVerdict"></p>
+  </div>
+  <div class="tbl-wrap"><table class="num-r">
+    <tr><th>场景（token·layer）</th><th>CED + Bounded</th><th>CED + 精确</th><th>精确 / Bounded</th></tr>
+    <tr><td>首次输入 100,000</td><td>2,002,560</td><td>2,051,200</td><td>仅多约 2.4%</td></tr>
+    <tr><td>长历史 + 新增 500</td><td>12,560</td><td>61,200</td><td>约 4.9 倍</td></tr>
+  </table></div>
+  <p class="small"><b>结论：长输入时，精确回放未必贵；频繁的小增量请求，才容易被固定回放成本拖累。</b></p>
+  <p class="small muted">以上为简单整段回放的工作量估算，不是实测 FLOPs 或延迟。约 2560 是回溯范围的量级，不是精确最小值；精确实现可逐层缩小计算范围，进一步省算。若总 prompt 不足该范围，只需处理实际存在的位置。</p>
+
+  <h4>⑤ 和 YoCo 的关系</h4>
+  <p class="small">YoCo（You Only Cache Once，2024）的下半部分生成一份全局 KV，上半部分所有层通过 cross-attention 共享这一份，因此 prefill 可以在中间提前结束。报告称 CED 在此基础上做了结构改进，目标是同时提升「KV cache 容量」和「KV 生成的计算深度」。从文中能对应上的改动有：</p>
+  <ul class="small">
+    <li>decoder 每层仍保留自己的 SWA，局部状态的计算深度不缩水</li>
+    <li>允许逐层投影，并与 CSA2 的 Full / Reindex / Reuse 跨层复用结合</li>
+    <li>encoder 自身也有全局 KV（L3/L9/L15，压缩率 2），decoder 全局 KV 不压缩（压缩率 1）</li>
+    <li>用 Bounded Replay 解决局部状态的回放成本</li>
+  </ul>
+
+  <h4>⑥ 为什么 encoder 必须是因果的</h4>
+  <ul class="small">
+    <li><b>前缀缓存可行</b>：已有 token 的状态不会因后面追加内容而改变。双向 encoder 每追加一段内容，就要把整段上下文重新编码</li>
+    <li><b>输出自然变成输入</b>：上一轮生成的 token 已经走过 encoder，下一轮直接接在后面</li>
+  </ul>
+
+  <h4>⑦ 代价与风险</h4>
+  <ul class="small">
+    <li><b>decoder 的全局记忆只有 20 层深</b>：普通结构中深层 KV 来自深层表示。应对：decoder 全局 KV 不压缩、每层保留自己的 query 和 SWA、通过 Reindex 让深层重新选择读哪些位置</li>
+    <li><b>Bounded Replay 是近似</b>：与完整前向不等价，极端情况的鲁棒性仍需压测</li>
+    <li>报告没有给出 CED 的单独消融，只说在 prefill 接近减半的同时性能与基线相当</li>
+  </ul>
+</template>
+
+<template id="note-input-heavy" data-title="为什么长程 Agent 的负载以输入为主？">
+  <div class="callout ok"><b class="t">一句话</b>原因有两个：<b>单轮内</b>，工具返回的内容远长于模型发出的调用；<b>跨轮次</b>，整段历史每一轮都要被重新读取。第一点决定了单轮的输入输出比，第二点让这个比值随轮数继续放大。</div>
+
+  <h4>① 单轮内：读一次，回来一大段</h4>
+  <div class="tbl-wrap"><table>
+    <tr><th>方向</th><th class="wrap">典型内容</th><th>量级</th></tr>
+    <tr><td>模型输出</td><td class="wrap"><code>read_file(path)</code>、<code>grep(pattern)</code>、一小段 patch，加上简短推理</td><td>几十 ~ 几千</td></tr>
+    <tr><td>工具返回</td><td class="wrap">整个源文件、搜索结果、测试日志、编译报错、网页和文档</td><td>几千 ~ 几万</td></tr>
+  </table></div>
+  <p class="small muted">模型花 100 个 token 发起一次读取，可能换回 10K token 的内容，而这些内容都会成为下一轮的输入。</p>
+
+  <h4>② 跨轮次：历史被反复读取</h4>
+  <p>设每轮新增 \(\Delta\) 个 token（工具返回加上本轮输出），模型每轮输出 \(o\) 个 token，共 \(T\) 轮。第 \(t\) 轮开始时上下文约为 \(t\Delta\)，所以：</p>
+  \[ \text{累计输入}\approx\sum_{t=1}^{T} t\,\Delta\approx\frac{T^2\Delta}{2},\qquad \text{累计输出}=T\,o,\qquad \frac{\text{输入}}{\text{输出}}\approx\frac{T\Delta}{2o} \]
+  <p class="small">累计输入按 \(T^2\) 增长，输出只按 \(T\) 增长。<b>任务越长，输入占比越高。</b></p>
+
+  <div class="card">
+    <b>交互：估算一次 Agent 任务的输入输出（简化模型）</b>
+    <div class="ctrl"><span style="width:118px">轮数 T</span><input type="range" id="ihT" min="5" max="300" step="5" value="100"><span class="out" id="ihTv"></span></div>
+    <div class="ctrl"><span style="width:118px">每轮工具返回</span><input type="range" id="ihR" min="500" max="30000" step="500" value="4500"><span class="out" id="ihRv"></span></div>
+    <div class="ctrl"><span style="width:118px">每轮模型输出 o</span><input type="range" id="ihO" min="100" max="5000" step="100" value="500"><span class="out" id="ihOv"></span></div>
+    <svg class="diagram" viewBox="0 0 500 150" id="ihSvg"></svg>
+    <div class="legend" style="margin:4px 0 8px"><span><i style="background:var(--swa)"></i>重读的历史</span><span><i style="background:var(--amber)"></i>本轮工具返回</span><span><i style="background:var(--cyan)"></i>本轮输出</span></div>
+    <div class="kv" id="ihStats"></div>
+  </div>
+
+  <h4>③ 有了前缀缓存，成本去了哪里？</h4>
+  <p class="small">前缀缓存让旧历史<b>不必重新计算</b>，但成本并没有消失，而是转移到了两处。它们正好对应 V4.1 的两类设计：</p>
+  <div class="tbl-wrap"><table>
+    <tr><th>情形</th><th class="wrap">瓶颈</th><th class="wrap">V4.1 的对策</th></tr>
+    <tr><td>缓存命中</td><td class="wrap"><b>存与搬</b>：每轮要把百万 token 级别的 KV 从 SSD / host 加载回 HBM，还要长期保存</td><td class="wrap">CSA2 + FP4：全局 KV 缩到 1/4；SWA 移出持久化缓存：持久化占用缩到 1/8</td></tr>
+    <tr><td>新增内容 / 未命中</td><td class="wrap"><b>Prefill 计算</b>：新增的 Δ 每轮都要 prefill；缓存被淘汰、上下文压缩或改写、多 Agent fork 时要大段重算</td><td class="wrap">CED：prompt 只经过前 20 层，每 token 激活 8B</td></tr>
+  </table></div>
+  <p class="small muted">报告原文：“In agentic workflows, frequent tool calls generate extensive prefill requests, imposing severe computational overhead when KV caches miss.”</p>
+
+  <h4>④ 一个补充：thinking 模式</h4>
+  <p class="small">开启 thinking 时，单轮输出 \(o\) 会变大，输入输出比会被拉低。但推理 token 通常不会全部留在后续轮次的上下文里，而工具结果会一直留着，所以长程任务整体上仍然以输入为主。这也是 V4.1 把推理强度做成可调（effort 1–100）的原因之一：输出这一侧的成本也需要单独控制。</p>
+</template>
+
+<script>
+/* ---------- theme ---------- */
+document.getElementById('themeBtn').onclick=()=>{const r=document.documentElement;r.dataset.theme=r.dataset.theme==='light'?'':'light';drawAll();};
+
+/* ---------- KaTeX ---------- */
+window.addEventListener('load',()=>{ if(window.renderMathInElement){ renderMathInElement(document.body,{delimiters:[{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false}],throwOnError:false}); }});
+
+/* ---------- layer map ---------- */
+const kvSrc=[3,9,15,21], idxSrc=[25,29,33,37];
+function layerInfo(i){
+  const enc=i<=20, m= i<=2?null:(enc?2:1);
+  let mode='Reuse';
+  if(i<=2) mode='SWA'; else if(kvSrc.includes(i)) mode='Full'; else if(idxSrc.includes(i)) mode='Reindex';
+  const prevFull=[...kvSrc].reverse().find(x=>x<=i && (enc? x<=20 : x>20));
+  const prevIdx=[...kvSrc,...idxSrc].sort((a,b)=>a-b).reverse().find(x=>x<=i && (enc? x<=20: x>20));
+  return {i,enc,m,mode,prevFull,prevIdx,engram:(i===2||i===15),dspark:(i>=38),pool:(i===21)};
+}
+function renderLayers(){
+  const enc=document.getElementById('lmEnc'), dec=document.getElementById('lmDec');
+  for(let i=1;i<=40;i++){
+    const L=layerInfo(i), d=document.createElement('div');
+    d.className='lyr m-'+L.mode; d.dataset.i=i;
+    d.innerHTML=`<span>L${i}</span><span style="font-size:9px;opacity:.85">${L.mode==='Reindex'?'ReIdx':L.mode}</span>`+
+      (L.engram?'<span class="badge">E</span>':'')+(L.dspark?'<span class="badge ds">D</span>':'')+(L.pool?'<span class="badge cp">P</span>':'');
+    d.onclick=()=>showLayer(i);
+    (i<=20?enc:dec).appendChild(d);
+  }
+  showLayer(21);
+}
+function showLayer(i){
+  document.querySelectorAll('.lyr').forEach(e=>e.classList.toggle('sel',+e.dataset.i===i));
+  const L=layerInfo(i); let kv='', idx='', desc='';
+  const poolLink=`<span class="note" data-note="candidate-pool" role="button" tabindex="0">${L.pool?'构建候选池':'候选池'}<span class="tip">L21 为当前 query 筛选最多 2048 个 block，每块 8 个位置。后续 Reindex 层在这个范围内各自重选 Top-512，不是直接读取整个候选池。<em>点击查看构建步骤与小例子 →</em></span></span>`;
+  if(L.mode==='SWA'){kv='无全局分支';idx='无';desc='只有局部滑动窗口注意力（窗口 128），用来让浅层专注局部模式。';}
+  else if(L.mode==='Full'){
+    kv= L.enc?`本层由自身隐状态 H_${i} 生成（m=2，FP4）`:'由 encoder 输出 H_20 投影生成（CED，m=1，FP4）';
+    idx='本层 indexer 对全部因果可见位置打分，取 Top-512';
+    desc= L.enc?`第 ${[3,9,15].indexOf(i)+1} 组的组首，后面 5 个 Reuse 层共享它的 KV 和索引。`:`Decoder 唯一的 Full 层：生成 decoder 共享的全局 KV，并为当前 query ${poolLink}（最多 16,384 个因果可见位置，供后续 Reindex 层筛选）。`;
+  } else if(L.mode==='Reindex'){
+    kv=`复用 L${L.prevFull} 的 main KV 与 indexer K`; idx=`用本层 indexer Q 在${poolLink}（最多 16,384 个位置）内重新打分，取 Top-512`;
+    desc='Decoder 中每 4 层一组的组首：共享 KV，但允许深层重新选择关注的位置。';
+  } else {
+    kv=`复用 L${L.prevFull} 的 main KV`; idx=`复用 L${L.prevIdx} 的 Top-512 索引`;
+    desc='最轻量的层：不计算 indexer，只算本层的 Q、SWA KV 和稀疏注意力（prefill 15 个 kernel，decode 11 个）。';
+  }
+  const extra=[]; if(L.engram) extra.push('Engram 条件记忆模块（约 98B，n-gram 2/3/4）');
+  if(L.dspark) extra.push('DSpark drafter 读取该层的 attention input'); if(L.pool) extra.push('候选池构建者（2048 blocks × 8）');
+  document.getElementById('layerInfo').innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><b style="font-size:17px">Layer ${i}</b>
+    <span class="pill p-${L.mode.toLowerCase()}">${L.mode}</span><span class="small muted">${L.enc?'Causal Encoder':'Decoder'}${L.m?' · 压缩率 m='+L.m:''}</span></div>
+    <div class="kv"><div><span class="note" data-note="global-vs-swa" tabindex="0">全局 KV<span class="tip">负责「远」：覆盖全部历史，经过压缩和 Top-K 稀疏选择，只有 4 个 Full 层生成，其余层跨层复用。存 FP4。<em>点击查看全局 KV 与 SWA KV 的区别 →</em></span></span></div><div>${kv}</div><div>Top-K 索引</div><div>${idx}</div>
+    <div><span class="note" data-note="global-vs-swa" tabindex="0">SWA KV<span class="tip">负责「近」：只覆盖最近 128 个 token，逐 token、不压缩、全部读取；每层都用自己的隐状态生成，从不跨层共享。存 FP8。<em>点击查看两者如何配合 →</em></span></span></div><div>本层自身隐状态生成，FP8，窗口 128${L.enc?'':'（prefill 时通过 Decoder Bounded Replay 生成）'}</div>
+    <div>注意力读取</div><div>${L.mode==='SWA'?'只读本层最近 128 个 SWA 条目':'本层 Query 同时读「Top-512 个全局条目 + 最近 128 个 SWA 条目」，拼接后做一次注意力。两路独立选择，窗口内的位置可能被同时读取（不去重）'}</div>
+    <div>FFN</div><div>MoE：1 shared + 384 routed，Top-6</div>
+    ${extra.length?`<div>附加</div><div>${extra.join('；')}</div>`:''}</div>
+    <p class="small muted" style="margin:8px 0 0">${desc}</p>`;
+  const sourceKeys=L.mode==='SWA'?['windowKV']:L.mode==='Full'?['mainKV','indexer']:L.mode==='Reindex'?['indexer','sharing']:['sharing','windowKV'];
+  if(L.pool) sourceKeys.push('candidates');
+  if(L.engram) sourceKeys.push('engram');
+  if(L.dspark) sourceKeys.push('draft');
+  document.getElementById('layerInfo').appendChild(makeSourceLinks(sourceKeys));
+}
+
+/* ---------- CED calc ---------- */
+function fmtTok(n){return n>=1e6?(n/1048576).toFixed(2)+'M':n>=1024?(n/1024).toFixed(1)+'K':Math.round(n)+'';}
+function updCED(){
+  const N=Math.round(Math.pow(2,+document.getElementById('nSlider').value)), L=40, w=128;
+  const std=N*L, ced=N*L/2+Math.min(N,w)*L/2, exact=N*L/2+Math.min(N,w*L/2)*L/2;
+  document.getElementById('nOut').textContent=fmtTok(N)+' tokens';
+  const mx=Math.max(std,ced,exact);
+  [['bStd','vStd',std],['bCed','vCed',ced],['bExact','vExact',exact]].forEach(([b,v,x])=>{document.getElementById(b).style.width=(x/mx*100)+'%';document.getElementById(v).textContent=(x/std*100).toFixed(1)+'%';});
+  document.getElementById('cedNote').textContent=`完整 prompt 为 ${N.toLocaleString('zh-CN')} 个 token 时，Bounded 约为标准结构的 ${(ced/std*100).toFixed(1)}%。本例精确回放按最后 ${Math.min(N,w*L/2).toLocaleString('zh-CN')} 个位置跑满 20 层估算；总 prompt 较短时不会回放不存在的历史。这不是实测延迟。`;
+}
+
+/* ---------- KV calc ---------- */
+function fmtB(b){return b>=1e9?(b/1e9).toFixed(2)+' GB':b>=1e6?(b/1e6).toFixed(1)+' MB':(b/1e3).toFixed(1)+' KB';}
+function updKV(){
+  const N=Math.round(Math.pow(2,+document.getElementById('ctxSlider').value));
+  document.getElementById('ctxOut').textContent=fmtTok(N)+' tokens';
+  const a=890*N, b=890*4*N, pa=890*N, pb=890*8*N, mx=pb;
+  const set=(id,v)=>{document.getElementById(id).style.width=(v/mx*100)+'%';document.getElementById(id+'v').textContent=fmtB(v);};
+  set('kv41',a);set('kv4',b);set('p41',pa);set('p4',pb);
+  document.getElementById('kvNote').textContent=`对比：DeepSeek-V1（67B，GQA，95 层 × 8 KV heads × 128 维 × K/V × BF16 ≈ 389 KB/token）在同样长度下约需 ${fmtB(389120*N)}，约为 V4.1 的 437 倍。V4-Flash 的数值按报告中「≈4×」「≈8×」的比例估算。`;
+}
+
+/* ---------- SVG helpers ---------- */
+const C=()=>getComputedStyle(document.documentElement);
+function col(v){return C().getPropertyValue(v).trim();}
+
+function drawHSI(){
+  const s=document.getElementById('hsiSvg'); const t=col('--text'), m=col('--muted'), line=col('--line');
+  let h=`<text x="10" y="22" fill="${t}" font-size="13" font-weight="700">L21 · Full：全量打分（百万级位置）</text>`;
+  const n=96, w=9.4, x0=10;
+  const rnd=i=>Math.abs(Math.sin(i*12.9898)*43758.5453)%1;
+  const sel=new Set(), blocks=new Set();
+  for(let i=0;i<n;i++){ if(rnd(i)>0.86) sel.add(i); }
+  [...sel].forEach(i=>blocks.add(Math.floor(i/8)));
+  [2,7].forEach(b=>blocks.add(b));
+  for(let i=0;i<n;i++){
+    const inBlk=blocks.has(Math.floor(i/8));
+    h+=`<rect x="${x0+i*w}" y="34" width="${w-1.6}" height="20" rx="2" fill="${sel.has(i)?col('--green'):col('--card2')}" stroke="${line}"/>`;
+  }
+  blocks.forEach(b=>{h+=`<rect x="${x0+b*8*w-1}" y="31" width="${8*w}" height="26" rx="4" fill="none" stroke="${col('--blue')}" stroke-width="2"/>`;});
+  h+=`<text x="10" y="80" fill="${m}" font-size="12">绿色 = 本层 Top-512；蓝框 = 按块内最大分数选出的 block（最多 2048 × 8 = 16,384 个位置）组成共享候选池</text>`;
+  h+=`<line x1="480" y1="90" x2="480" y2="118" stroke="${m}" stroke-width="2" marker-end="url(#ar)"/>`;
+  h+=`<text x="10" y="140" fill="${t}" font-size="13" font-weight="700">L25 / L29 / L33 / L37 · Reindex：只在候选池内重新打分</text>`;
+  let k=0; const pool=[...blocks].sort((a,b)=>a-b);
+  pool.forEach(b=>{for(let j=0;j<8;j++){const i=b*8+j; const pick=rnd(i*7+3)>0.6;
+    h+=`<rect x="${x0+k*w*1.25}" y="152" width="${w*1.25-2}" height="20" rx="2" fill="${pick?col('--violet'):col('--card2')}" stroke="${line}"/>`;k++;}});
+  h+=`<text x="10" y="198" fill="${m}" font-size="12">紫色 = Reindex 层各自的新 Top-512。打分量由候选池上限决定，不再随上下文长度增长；其后的 Reuse 层直接沿用</text>`;
+  h+=`<text x="10" y="226" fill="${col('--amber')}" font-size="12.5" font-weight="700">结果：4K → 1M（256 倍），单 token decode FLOPs 只增加约 25%</text>`;
+  s.innerHTML=h;
+}
+
+function drawLR(){
+  const s=document.getElementById('lrSvg'); const t=col('--text'), m=col('--muted'), line=col('--line');
+  const W=960,H=260,pl=70,pr=20,pt=20,pb=50, X=v=>pl+(v/45)*(W-pl-pr), lrMax=2.6e-4, Y=v=>pt+(1-v/lrMax)*(H-pt-pb);
+  let pts=[]; for(let x=0;x<=45;x+=0.1){let lr; if(x<0.3) lr=lrMax*x/0.3; else if(x<=28) lr=lrMax; else if(x<=40){const p=(x-28)/12; lr=2.6e-5+(lrMax-2.6e-5)*0.5*(1+Math.cos(Math.PI*p));} else lr=2.6e-5; pts.push(`${X(x).toFixed(1)},${Y(lr).toFixed(1)}`);}
+  let h=`<rect x="${X(0)}" y="${pt}" width="${X(34)-X(0)}" height="${H-pt-pb}" fill="${col('--blue')}" opacity=".07"/>`+
+    `<rect x="${X(34)}" y="${pt}" width="${X(45)-X(34)}" height="${H-pt-pb}" fill="${col('--violet')}" opacity=".12"/>`;
+  for(let x=0;x<=45;x+=5){h+=`<line x1="${X(x)}" y1="${H-pb}" x2="${X(x)}" y2="${H-pb+5}" stroke="${m}"/><text x="${X(x)}" y="${H-pb+20}" fill="${m}" font-size="11" text-anchor="middle">${x}T</text>`;}
+  h+=`<line x1="${pl}" y1="${H-pb}" x2="${W-pr}" y2="${H-pb}" stroke="${line}"/><line x1="${pl}" y1="${pt}" x2="${pl}" y2="${H-pb}" stroke="${line}"/>`;
+  h+=`<text x="${pl-8}" y="${Y(lrMax)+4}" fill="${m}" font-size="11" text-anchor="end">2.6e-4</text><text x="${pl-8}" y="${Y(2.6e-5)+4}" fill="${m}" font-size="11" text-anchor="end">2.6e-5</text>`;
+  h+=`<polyline points="${pts.join(' ')}" fill="none" stroke="${col('--cyan')}" stroke-width="3"/>`;
+  const mark=(x,txt,c,y)=>`<line x1="${X(x)}" y1="${pt}" x2="${X(x)}" y2="${H-pb}" stroke="${c}" stroke-dasharray="5 4" stroke-width="1.5"/><text x="${X(x)+5}" y="${y}" fill="${c}" font-size="12" font-weight="700">${txt}</text>`;
+  h+=mark(28,'28T：开始 cosine 衰减 · ViT 解冻',col('--amber'),pt+60);
+  h+=mark(34,'34T：64K → 1M 上下文',col('--violet'),pt+90);
+  h+=mark(40,'40T：恒定 LR',col('--rose'),pt+120);
+  h+=`<text x="${X(10)}" y="${pt+30}" fill="${t}" font-size="12.5">64K 稀疏注意力，从零训练</text><text x="${(X(0)+X(45))/2}" y="${H-8}" fill="${m}" font-size="12" text-anchor="middle">累计训练 token（batch = 100.6M tokens/step）</text>`;
+  s.innerHTML=h;
+}
+
+function drawEff(){
+  const s=document.getElementById('effSvg'); const tau=+document.getElementById('tauSlider').value; document.getElementById('tauOut').textContent=tau;
+  const m=col('--muted'), line=col('--line'); const W=420,H=220,pl=40,pr=12,pt=14,pb=34, X=b=>pl+(b-1)/99*(W-pl-pr), Y=v=>pt+(1-v)*(H-pt-pb);
+  let pts=[]; for(let b=1;b<=100;b++){pts.push(`${X(b)},${Y(Math.exp(-(b-1)/tau))}`);}
+  let h=`<line x1="${pl}" y1="${H-pb}" x2="${W-pr}" y2="${H-pb}" stroke="${line}"/><line x1="${pl}" y1="${pt}" x2="${pl}" y2="${H-pb}" stroke="${line}"/>`;
+  [1,25,50,75,100].forEach(b=>{h+=`<text x="${X(b)}" y="${H-pb+16}" fill="${m}" font-size="10.5" text-anchor="middle">${b}</text>`;});
+  h+=`<text x="${pl-6}" y="${Y(1)+4}" fill="${m}" font-size="10.5" text-anchor="end">k₀</text><text x="${pl-6}" y="${Y(0)+4}" fill="${m}" font-size="10.5" text-anchor="end">0</text>`;
+  [[50,'low'],[75,'high'],[100,'max']].forEach(([b,n])=>{const v=Math.exp(-(b-1)/tau);h+=`<line x1="${X(b)}" y1="${pt}" x2="${X(b)}" y2="${H-pb}" stroke="${col('--amber')}" stroke-dasharray="3 3"/><circle cx="${X(b)}" cy="${Y(v)}" r="4" fill="${col('--amber')}"/><text x="${X(b)-3}" y="${pt+10}" fill="${col('--amber')}" font-size="10.5" text-anchor="end">${n}</text>`;});
+  h+=`<polyline points="${pts.join(' ')}" fill="none" stroke="${col('--blue')}" stroke-width="2.5"/><text x="${(W)/2}" y="${H-4}" fill="${m}" font-size="11" text-anchor="middle">effort b</text>`;
+  s.innerHTML=h;
+}
+
+function drawAll(){drawHSI();drawLR();drawEff();}
+
+/* ---------- tabs ---------- */
+function bindTabs(id){const box=document.getElementById(id);box.querySelectorAll('button').forEach(b=>b.onclick=()=>{box.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  const panes=[...box.querySelectorAll('button')].map(x=>x.dataset.t);panes.forEach(p=>document.getElementById(p).classList.toggle('on',p===b.dataset.t));});}
+
+/* ---------- scroll spy ---------- */
+function spy(){const links=[...document.querySelectorAll('#toc a')];const secs=links.map(a=>document.querySelector(a.getAttribute('href')));
+  const y=window.scrollY+120;let idx=0;secs.forEach((s,i)=>{if(s&&s.offsetTop<=y)idx=i;});links.forEach((a,i)=>a.classList.toggle('active',i===idx));}
+
+const sourceRevision='314113f8a7dadb388215396ba5fbee2c610a04d6';
+const sourceBase=`https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash/blob/${sourceRevision}/`;
+const sourceCatalog={
+  config:{file:'config.json',start:60,end:127,label:'压缩率、KV / 索引来源层与候选池参数'},
+  compressor:{file:'inference/model.py',start:429,end:485,label:'Compressor：m>1 加权压缩，m=1 直接投影'},
+  sharing:{file:'inference/model.py',start:723,end:764,label:'Attention._compress_topk_idxs / _compress_kv：跨层复用'},
+  indexer:{file:'inference/model.py',start:527,end:581,label:'Indexer.forward：打分、因果掩码与 Top-K'},
+  candidates:{file:'inference/model.py',start:584,end:611,label:'select_candidate_blocks：块内最大值与最新块保留'},
+  window:{file:'inference/model.py',start:410,end:426,label:'get_window_topk_idxs：局部因果窗口'},
+  windowKV:{file:'inference/model.py',start:701,end:721,label:'Attention._window_kv：本层 SWA KV 与环形缓存'},
+  attention:{file:'inference/model.py',start:766,end:781,label:'Attention.forward：SWA / 全局 KV 拼接'},
+  sparseKernel:{file:'inference/kernel.py',start:358,end:385,label:'sparse_attn_kernel：按索引读取、统一 softmax'},
+  mainKV:{file:'inference/model.py',start:740,end:764,label:'Attention._compress_kv：全局 KV 投影与量化调用'},
+  quant:{file:'inference/kernel.py',start:98,end:204,label:'act_quant / fp4_act_quant：FP8 / FP4 数值格式'},
+  mhc:{file:'inference/model.py',start:950,end:996,label:'Block.hc_mixes / forward：pre-mix 跨子层传递'},
+  sinkhorn:{file:'inference/kernel.py',start:407,end:474,label:'hc_split_sinkhorn：系数约束与行列归一化'},
+  engramHash:{file:'inference/engram.py',start:160,end:184,label:'NgramHashState.forward：n-gram 哈希地址'},
+  engram:{file:'inference/model.py',start:296,end:365,label:'ParallelEngramEmbedding / Engram：查表与门控'},
+  dspark:{file:'inference/model.py',start:1131,end:1159,label:'DSparkBlock：草稿输入、Markov logits 与 confidence'},
+  draft:{file:'inference/model.py',start:1277,end:1285,label:'Transformer.forward_spec：串联草稿模块'},
+  gate:{file:'inference/model.py',start:794,end:829,label:'Gate：sqrtsoftplus、Top-K 与模态 correction bias'},
+  moe:{file:'inference/model.py',start:832,end:906,label:'Expert / MoE：路由专家与共享专家'},
+  vision:{file:'inference/vision.py',start:87,end:119,label:'ViT / Aligner：视觉编码与 token 降采样'},
+  image:{file:'inference/image_processor.py',start:101,end:173,label:'图像网格、patch 与多模态输入'},
+  forward:{file:'inference/model.py',start:1244,end:1275,label:'Transformer.forward：逐层前向与末尾输出'},
+  generation:{file:'inference/generate.py',start:199,end:218,label:'生成 CLI：chat / thinking 选项'},
+  flashmla:{url:'https://github.com/deepseek-ai/FlashMLA',label:'FlashMLA：注意力 kernel 仓库'},
+  deepgemm:{url:'https://github.com/deepseek-ai/DeepGEMM',label:'DeepGEMM：矩阵计算与融合算子仓库'},
+  deepep:{url:'https://github.com/deepseek-ai/DeepEP',label:'DeepEP：专家并行通信仓库'},
+  tilekernels:{url:'https://github.com/deepseek-ai/TileKernels',label:'TileKernels：通用融合算子仓库'}
+};
+const sourceNotes={
+  ced:'这是相关数据流，不是 CED 优化调度：本版 Transformer.forward 仍遍历全部层，未实现 prompt 中途停止与 Bounded Replay。',
+  candidates:'此参考实现先全量打分再屏蔽候选外位置；可以核对选择逻辑，但不代表已实现候选内稀疏打分的性能优化。',
+  quant:'KV 量化路径会反量化写回原张量，以模拟低精度数值；不能把该参考代码的实际显存占用等同于生产环境的 FP4 / FP8 紧凑缓存。',
+  replay:'在本次核对的官方推理文件中未找到 Bounded Replay 或 SSD / DRAM 两级缓存调度。下列链接仅用于理解需要恢复的局部状态。',
+  dspark:'含草稿前向与 confidence，但 generate.py 未接入完整的起草—验证—接受 / 回退循环；不代表生产投机解码调度。',
+  training:'这里只公开前向打分和候选规则，未给出 CSA2 索引器训练损失；不能据此确认采用 DSA 的 KL 蒸馏。'
+};
+const sourcePlacements=[
+  {target:'arch-map',keys:['config','sharing'],note:'层号在源码配置中从 0 起计；正文 L1 从 1 起计。源码入口均为官方推理参考实现。'},
+  {target:'ced',keys:['compressor','mainKV','forward'],note:sourceNotes.ced},
+  {target:'csa2',keys:['compressor','sharing','attention'],note:'Full / Reindex / Reuse 对应 KV source 和 index source 的分支，不是源码中的同名枚举。'},
+  {target:'hsi',after:true,keys:['indexer','candidates'],note:sourceNotes.candidates},
+  {target:'kvbudget',keys:['config','quant'],note:'890 B 是文中按配置与紧凑格式推导的预算，不是此参考实现的实测缓存字节数。'},
+  {target:'fp4',keys:['mainKV','quant','windowKV'],note:sourceNotes.quant},
+  {target:'replay',keys:['windowKV','forward'],note:sourceNotes.replay},
+  {target:'mhc',keys:['mhc','sinkhorn'],note:'可核对 pre-mix 传递与 Sinkhorn；不等于报告中将所有操作合成单 kernel 的 Mega-mHC。'},
+  {target:'engram',keys:['engramHash','engram'],note:'模型内哈希查表与门控参考实现；不含 host RDMA 预取或训练优化器。'},
+  {target:'dspark',keys:['dspark','draft'],note:sourceNotes.dspark},
+  {target:'moe',keys:['gate','moe','vision','image'],note:'MoE 前向与视觉输入处理；不含训练时负载均衡更新或完整 ViT 训练流程。'},
+  {target:'hparams',keys:['config'],note:'发布模型的真实超参；不要用 ModelArgs 的示例默认值代替，也不要把此嵌套配置直接传给参考生成脚本。'},
+  {target:'infra',keys:['flashmla','deepgemm','deepep','tilekernels'],title:'源码阅读 · 官方组件仓库',note:'仓库入口随维护更新；可阅读算子与通信组件，但不代表已公开整套训练、EPD 调度或 DSec 平台。'},
+  {target:'effort',keys:['generation'],note:'仅能核对 chat / thinking 模式。此 CLI 没有 effort 1–100 的独立参数，也未公开长度惩罚的训练实现。'},
+  {target:'optim',keys:[],title:'源码公开范围',note:'本次核对的官方 inference 代码没有 Muon / head-wise Muon / 嵌入表 Sinkhorn 优化器。mHC 的 Sinkhorn 是连接矩阵约束，不能充当优化器源码。'}
+];
+function makeSourceLinks(keys,note='',title='源码阅读 · 官方推理参考实现（固定版本）'){
+  const box=document.createElement('div'); box.className='source-links';
+  const heading=document.createElement('div'); heading.className='source-title'; heading.textContent=title; box.appendChild(heading);
+  const list=document.createElement('ul');
+  for(const key of keys){
+    const item=sourceCatalog[key], li=document.createElement('li'), a=document.createElement('a');
+    a.href=item.url||`${sourceBase}${item.file}#L${item.start}-L${item.end}`;
+    a.target='_blank'; a.rel='noopener noreferrer';
+    const code=document.createElement('code'); code.textContent=item.url?item.label:`${item.file}:${item.start}–${item.end}`; a.appendChild(code);
+    if(item.file) a.appendChild(document.createTextNode(` · ${item.label}`));
+    a.title=`${item.label}（新标签页打开）`; li.appendChild(a); list.appendChild(li);
+  }
+  if(keys.length) box.appendChild(list);
+  if(note){const p=document.createElement('p'); p.textContent=note; box.appendChild(p);}
+  return box;
+}
+for(const entry of sourcePlacements){
+  const target=document.getElementById(entry.target), box=makeSourceLinks(entry.keys,entry.note,entry.title);
+  if(entry.after) target.insertAdjacentElement('afterend',box); else target.appendChild(box);
+}
+const noteSourcePlacements=[
+  {id:'candidate-pool',keys:['candidates','indexer'],note:sourceNotes.candidates},
+  {id:'global-vs-swa',keys:['attention','window','indexer'],note:'先读拼接，再看窗口与全局的因果索引；不能把两路理解成互斥分区。'},
+  {id:'ced',keys:['mainKV','windowKV','forward'],note:sourceNotes.ced},
+  {id:'indexer-training',keys:['indexer','candidates'],note:sourceNotes.training}
+];
+for(const entry of noteSourcePlacements){
+  const content=document.getElementById('note-'+entry.id).content;
+  content.querySelector('h4').before(makeSourceLinks(entry.keys,entry.note));
+}
+renderLayers();
+document.getElementById('nSlider').oninput=updCED; updCED();
+document.getElementById('ctxSlider').oninput=updKV; updKV();
+document.getElementById('tauSlider').oninput=drawEff;
+bindTabs('ptTabs'); bindTabs('evTabs');
+drawAll(); window.addEventListener('scroll',spy); spy();
+
+/* ---------- note drawer ---------- */
+const noteInit={
+  'global-vs-swa'(){
+    const MAXP=48, win=6;
+    const pickEnc=[1,4,9,13,17,21,23];             // selected group ids (m=2); 21 and 23 fall inside the window
+    const pickDec=[2,7,8,15,21,30,36,44,47];       // selected positions (m=1); 44 and 47 (= q itself) fall inside the window
+    function draw(mode){
+      const s=document.getElementById('gsSvg'); if(!s) return;
+      const W=500,pl=84,cw=(W-pl-8)/MAXP,rh=26,line=col('--line'),mu=col('--muted');
+      const rows=[{y:10,l:'全局 KV 条目'},{y:52,l:'SWA KV'},{y:94,l:'Query 实际读取'}];
+      const q = mode==='enc-even' ? 46 : 47;            // query position (0-indexed)
+      const inWin=p=>p>q-win && p<=q;
+      const G=new Set(); let partial=false;
+      let h='';
+      rows.forEach(r=>{h+=`<text x="${pl-8}" y="${r.y+17}" fill="${mu}" font-size="11" text-anchor="end">${r.l}</text>`;});
+      if(mode.startsWith('enc')){
+        const visible=Math.floor((q+1)/2);               // floor((t+1)/m)
+        for(let e=0;e<visible;e++){
+          const sel=pickEnc.includes(e); if(sel){G.add(2*e);G.add(2*e+1);}
+          h+=`<rect x="${pl+2*e*cw}" y="${rows[0].y}" width="${2*cw-1.5}" height="${rh-6}" rx="3" fill="${sel?col('--blue'):col('--card2')}" stroke="${line}"/>`;
+        }
+        if(2*visible<=q){ partial=true;
+          h+=`<rect x="${pl+2*visible*cw}" y="${rows[0].y}" width="${2*cw-1.5}" height="${rh-6}" rx="3" fill="none" stroke="${col('--rose')}" stroke-width="1.5" stroke-dasharray="3 2"/>`;
+        }
+      } else if(mode==='dec'){
+        for(let p=0;p<=q;p++){const sel=pickDec.includes(p);if(sel)G.add(p);
+          h+=`<rect x="${pl+p*cw}" y="${rows[0].y}" width="${cw-1.5}" height="${rh-6}" rx="2" fill="${sel?col('--blue'):col('--card2')}" stroke="${line}"/>`;}
+      } else {
+        h+=`<rect x="${pl}" y="${rows[0].y}" width="${(q+1)*cw-1.5}" height="${rh-6}" rx="3" fill="${col('--card2')}" stroke="${line}" stroke-dasharray="4 3"/><text x="${pl+(q+1)*cw/2}" y="${rows[0].y+14}" fill="${mu}" font-size="11" text-anchor="middle">无全局分支</text>`;
+      }
+      let nOverlap=0, nSwaOnly=0;
+      for(let p=0;p<=q;p++){
+        const w=inWin(p), g=G.has(p);
+        h+=`<rect x="${pl+p*cw}" y="${rows[1].y}" width="${cw-1.5}" height="${rh-6}" rx="2" fill="${w?col('--cyan'):col('--card2')}" stroke="${line}"/>`;
+        let f=col('--card2');
+        if(w&&g){f=col('--violet');nOverlap++;} else if(w){f=col('--cyan');nSwaOnly++;} else if(g) f=col('--blue');
+        h+=`<rect x="${pl+p*cw}" y="${rows[2].y}" width="${cw-1.5}" height="${rh-6}" rx="2" fill="${f}" stroke="${p===q?col('--amber'):line}" stroke-width="${p===q?2:1}"/>`;
+      }
+      h+=`<text x="${pl+q*cw+cw/2}" y="${rows[2].y+34}" fill="${col('--amber')}" font-size="11" text-anchor="middle" font-weight="700">q</text>`;
+      h+=`<text x="${pl}" y="${rows[2].y+48}" fill="${mu}" font-size="10">← 更早的位置</text><text x="${W-8}" y="${rows[2].y+48}" fill="${mu}" font-size="10" text-anchor="end">当前位置 →</text>`;
+      s.innerHTML=h;
+      const ov=`本例中窗口内有 <b style="color:var(--violet)">${nOverlap}</b> 个位置被两路同时读取（紫色），${nSwaOnly} 个只来自 SWA。`;
+      document.getElementById('gsNote').innerHTML={
+        'enc-odd':`Encoder 全局条目每个覆盖 2 个 token（宽格）。query 在奇数位置 t=2k+1（从 0 计）时，它所在的组 {t-1, t} 刚好完成，所以<b>连同 query 自己在内的组都可能被 Top-K 选中</b>。这个组只含前一个 token 和 query 自己，<b>不含未来 token</b>。Top-K 不排除窗口，因此窗口内会出现重叠。${ov}`,
+        'enc-even':`query 在偶数位置时，它所在的组还缺一个 token，<b>尚未压缩</b>（红色虚线框），全局分支看不到它，<b>只能靠 SWA</b>。这正是 SWA 不可替代的地方。${ov}`,
+        dec:`Decoder 不压缩（m=1），可见条目数为 ⌊(t+1)/1⌋ = t+1，<b>当前 token 自己也在全局可见范围内</b>。同一位置在两路中是两个不同的 key：全局来自 H₂₀ 的投影，SWA 来自本层 Hₗ。${ov}`,
+        swa:'L1–L2 只有 SWA，每个 query 只看最近 128 个 token。浅层先专注局部模式，从 L3 起才接入全局分支。'
+      }[mode];
+    }
+    const box=document.getElementById('gsTabs');
+    box.querySelectorAll('button').forEach(b=>b.onclick=()=>{box.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');draw(b.dataset.m);});
+    draw('enc-odd');
+  },
+  'ced'(){
+    /* receptive field diagram (scaled: window=4, 5 decoder layers) */
+    const w=4, rows=4, P=28;
+    function drawRF(mode){
+      const s=document.getElementById('rfSvg'); if(!s) return;
+      const W=500,pl=78,top=8,rh=30,cw=(W-pl-8)/P, line=col('--line'), mu=col('--muted');
+      let h='';
+      const labels=['D5 输入','D4 输入','D3 输入','D2 输入'];
+      for(let r=0;r<=rows;r++){
+        const y=top+r*rh, isEnc=r===rows;
+        h+=`<text x="${pl-8}" y="${y+16}" fill="${mu}" font-size="10.5" text-anchor="end">${isEnc?'E / D1 输入':labels[r]}</text>`;
+        const need = mode==='exact' ? Math.min(P, w + r*(w-1)) : w;
+        for(let p=0;p<P;p++){
+          const active = p >= P-need;
+          let fill=col('--card2'), op=1;
+          if(active) fill = isEnc ? col('--blue') : (mode==='exact'?col('--amber'):col('--cyan'));
+          if(mode==='bounded' && !active && p>=P-w-(w-1)) { fill=col('--rose'); op=.25; }
+          h+=`<rect x="${pl+p*cw}" y="${y}" width="${cw-1.5}" height="${rh-8}" rx="2" fill="${fill}" opacity="${op}" stroke="${line}"/>`;
+        }
+      }
+      h+=`<text x="${pl}" y="${top+(rows+1)*rh+2}" fill="${mu}" font-size="10">← 更早的位置</text><text x="${W-8}" y="${top+(rows+1)*rh+2}" fill="${mu}" font-size="10" text-anchor="end">prompt 末尾 →</text>`;
+      s.innerHTML=h;
+      document.getElementById('rfNote').innerHTML = mode==='exact'
+        ? '缩小示意：窗口 4、decoder 5 层。每行是生成该层 SWA KV 所需的输入位置；从 D5 向 D1 追溯，依赖不断向前扩展。真实 20 层、窗口 128 的回溯范围约为 2560，非精确最小值；也不要求所有位置都跑满所有层。'
+        : '只保留一个窗口（图中 4，实际 128）。淡红位置未参与局部计算，靠近片段起点的输出可能偏离完整前向，偏差再传入深层 KV。全局分支仍可读取历史，但不能保证消除这种局部偏差。';
+    }
+    const box=document.getElementById('rfTabs');
+    box.querySelectorAll('button').forEach(b=>b.onclick=()=>{box.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');drawRF(b.dataset.m);});
+    drawRF('exact');
+    /* three-way calculator */
+    const sl=document.getElementById('cedN');
+    function upd(){
+      const N=Math.round(Math.pow(2,+sl.value)), L=40, win=128;
+      const std=N*L, bnd=N*L/2+win*L/2, exact=N*L/2+win*L/2*L/2;
+      document.getElementById('cedNv').textContent=N.toLocaleString('zh-CN')+' tokens';
+      const mx=Math.max(std,bnd,exact);
+      [['cb1','cv1',std],['cb2','cv2',bnd],['cb3','cv3',exact]].forEach(([b,v,x])=>{document.getElementById(b).style.width=(x/mx*100)+'%';document.getElementById(v).textContent=(x/std*100).toFixed(0)+'%';});
+      document.getElementById('cedVerdict').innerHTML = `条形按标准结构归一化。本轮 N=${N.toLocaleString('zh-CN')}：精确回放方案总量约为 Bounded 的 <b>${(exact/bnd).toFixed(2)} 倍</b>（多 ${((exact/bnd-1)*100).toFixed(1)}%）。${N<2560?'新增输入越短，固定回放成本越显著；即使新增不足 128，仍可从已缓存历史补足一个窗口。':'输入较长时，两种 CED 方案都逐渐接近标准结构的一半，精确回放的相对代价变小。'}`;
+    }
+    sl.oninput=upd; upd();
+  },
+  'input-heavy'(){
+    const T=document.getElementById('ihT'), R=document.getElementById('ihR'), O=document.getElementById('ihO');
+    const fmt=n=>n>=1e9?(n/1e9).toFixed(2)+'B':n>=1e6?(n/1e6).toFixed(2)+'M':n>=1e3?(n/1e3).toFixed(1)+'K':Math.round(n)+'';
+    function upd(){
+      const t=+T.value, r=+R.value, o=+O.value, d=r+o;
+      document.getElementById('ihTv').textContent=t; document.getElementById('ihRv').textContent=fmt(r); document.getElementById('ihOv').textContent=fmt(o);
+      const inSum=d*t*(t-1)/2+t*r, outSum=t*o, ctx=t*d;
+      const st=document.getElementById('ihStats');
+      st.innerHTML=`<div>累计输入</div><div><b>${fmt(inSum)}</b> tokens</div>
+        <div>累计输出</div><div><b>${fmt(outSum)}</b> tokens</div>
+        <div>输入 : 输出</div><div><b style="color:var(--amber);font-size:16px">${Math.round(inSum/outSum)} : 1</b></div>
+        <div>需要 prefill 的增量</div><div>${fmt(t*r)} tokens（缓存全部命中时，只有工具返回需要 prefill）</div>
+        <div>累计读取的全局 KV</div><div>≈ ${(inSum*890/1e9).toFixed(1)} GB（按 V4.1 每 token 890 B 估算；V4-Flash 约为 4 倍）</div>
+        <div>最终上下文</div><div>${fmt(ctx)} tokens${ctx>1048576?' <span style="color:var(--rose)">（已超过 1M，实际需要压缩上下文，压缩后前缀缓存会失效）</span>':''}</div>`;
+      const s=document.getElementById('ihSvg'), W=500,H=150,pl=8,pb=18,n=Math.min(t,30), mx=(t-1)*d+r+o, bw=(W-2*pl)/n;
+      let h='';
+      for(let k=0;k<n;k++){
+        const ti=Math.round(1+k*(t-1)/Math.max(n-1,1)), hist=(ti-1)*d, sc=v=>v/mx*(H-pb-6);
+        const x=pl+k*bw, y0=H-pb;
+        h+=`<rect x="${x}" y="${y0-sc(hist)}" width="${bw-2}" height="${sc(hist)}" fill="${col('--swa')}" opacity=".75"/>`;
+        h+=`<rect x="${x}" y="${y0-sc(hist+r)}" width="${bw-2}" height="${sc(r)}" fill="${col('--amber')}"/>`;
+        h+=`<rect x="${x}" y="${y0-sc(hist+r+o)}" width="${bw-2}" height="${Math.max(sc(o),0.8)}" fill="${col('--cyan')}"/>`;
+        if(k===0||k===n-1) h+=`<text x="${x+bw/2}" y="${H-4}" fill="${col('--muted')}" font-size="10" text-anchor="middle">第 ${ti} 轮</text>`;
+      }
+      s.innerHTML=h;
+    }
+    [T,R,O].forEach(e=>e.oninput=upd); upd();
+  }
+};
+const drawer=document.getElementById('noteDrawer'), mask=document.getElementById('noteMask');
+let lastTrigger=null;
+function openNote(id,trigger){
+  const tpl=document.getElementById('note-'+id); if(!tpl) return;
+  if(!drawer.classList.contains('on')) lastTrigger=trigger||null;
+  document.getElementById('noteTitle').textContent=tpl.dataset.title||'';
+  const body=document.getElementById('noteBody'); body.innerHTML=''; body.appendChild(tpl.content.cloneNode(true)); body.scrollTop=0;
+  if(window.renderMathInElement) renderMathInElement(body,{delimiters:[{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false}],throwOnError:false});
+  if(noteInit[id]) noteInit[id]();
+  drawer.classList.add('on'); mask.classList.add('on'); document.getElementById('noteClose').focus();
+}
+function closeNote(){drawer.classList.remove('on'); mask.classList.remove('on'); if(lastTrigger) lastTrigger.focus();}
+document.addEventListener('click',e=>{const el=e.target.closest('.note[data-note]'); if(el){e.preventDefault();openNote(el.dataset.note,el);}});
+document.addEventListener('keydown',e=>{const el=e.target.closest&&e.target.closest('.note[data-note]'); if(el&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openNote(el.dataset.note,el);}});
+mask.onclick=closeNote; document.getElementById('noteClose').onclick=closeNote;
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&drawer.classList.contains('on')) closeNote();});
+</script>
+</body>
+</html>

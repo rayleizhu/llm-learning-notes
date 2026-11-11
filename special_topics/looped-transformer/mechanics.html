@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Looped Transformer 原理补充：循环公式、两个计算轴、随机深度训练、截断反向传播、停止条件与 KV Cache。">
+  <meta name="color-scheme" content="light dark">
+  <title>原理与工程细节 · Looped Transformer</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="script.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到正文</a>
+  <aside class="sidebar">
+    <a class="brand" href="index.html"><span>Looped Transformer</span> 解读</a>
+    <div class="sub">补充 A · 公式、训练与系统账本</div>
+    <nav class="toc" aria-label="补充说明目录">
+      <a href="#equations" class="active"><span>A1</span> 公式与状态更新</a>
+      <a href="#axes"><span>A2</span> 两个计算轴</a>
+      <a href="#training"><span>A3</span> 怎样训练循环</a>
+      <a href="#gradient-sharing" class="l2">梯度汇总与学习效率</a>
+      <a href="#halting"><span>A4</span> 何时停止计算</a>
+      <a href="#not-diffusion"><span>A5</span> 扩散与平衡模型</a>
+      <a href="#kv-cache"><span>A6</span> KV Cache 的代价</a>
+      <a href="#cost"><span>A7</span> 计算与部署预算</a>
+      <a href="#hardware-budget" class="l2">硬件协同设计的验证条件</a>
+    </nav>
+    <div class="sidebar-bottom">
+      <a class="sidebar-extra" href="index.html">← 返回专题主页面</a>
+      <a class="sidebar-extra" href="evidence.html">补充 B · 论文与证据边界 ↗</a>
+      <button class="theme-toggle" type="button" aria-pressed="true">切换浅色模式</button>
+      <div class="reading-progress" aria-hidden="true"><span></span></div>
+      <p class="tiny muted">先区分架构共性，再讨论具体实现。</p>
+    </div>
+  </aside>
+  <div class="page">
+    <header class="topbar"><span>TECHNICAL NOTES <span class="slash">/</span> SUPPLEMENT A</span><a href="index.html">← 专题主页面</a></header>
+    <main id="main" class="prose">
+      <header class="article-hero"><div class="eyebrow"><span class="status-dot"></span> 补充 A / 原理与工程</div><h1>一次循环背后，<br><span>还有哪些实现细节？</span></h1><p class="lead">从状态更新到训练，再到缓存与推理调度。本文以公开的 Huginn / Recurrent Depth 设计为具体例子，不暗示所有循环 Transformer 都采用相同细节。</p><div class="article-meta"><span>先修：Transformer、因果注意力、自回归生成</span><a href="index.html#architecture">返回架构概览 ↗</a></div></header>
+
+      <section id="equations" class="section">
+        <div class="section-heading"><span class="section-number">A1 / STATE UPDATE</span><h2>把参数和状态分开看。</h2></div>
+        <p>最简的深度循环可以写成反复应用同一函数。Huginn 的设计更具体：每轮同时输入原始上下文的编码与上一轮状态。</p>
+        <div class="equation-card"><span class="card-kicker">HUGINN 宏观设计 · 论文 v2 §3.1</span><div class="equation">e = P(x)<br>s<sub>0</sub> ∼ N(0, σ²I)<br>s<sub>r+1</sub> = F<sub>θ</sub>(s<sub>r</sub>, e), &nbsp; r = 0, …, R − 1<br>p = C(s<sub>R</sub>)</div><p>这是宏观公式。论文实际大模型的初始化使用截断正态分布；具体归一化、尺度与采样细节见 §3.2、§4.1。</p></div>
+        <dl class="symbol-list"><dt>x</dt><dd>输入 token 序列。</dd><dt>P / e</dt><dd>前置模块（Prelude）及其输出；e 为整段序列的输入表示。</dd><dt>s<sub>r</sub></dt><dd>第 r 轮隐藏状态；整序列形式为 n × d 矩阵，不只是一枚 token 的向量。</dd><dt>F<sub>θ</sub></dt><dd>带共享参数 θ 的循环核心，可包含多层因果自注意力与 MLP。</dd><dt>R</dt><dd>本次采用的循环次数；不等于参数副本数。</dd><dt>C / p</dt><dd>输出模块（Coda）及预测分布；包括输出层与词表投影等步骤。</dd></dl>
+        <h3>为什么每次都送入 e？</h3>
+        <p>把更新规则理解成“依据题目 e 修正当前解 s”。如果题目只在初始化时出现，反复更新可能丢失条件信息。Huginn 在每轮将状态与 e 拼接，再通过可学习 adapter 映射回隐藏维度，使原始输入始终可达。</p>
+        <p>这是一种稳定迭代的设计选择，不是数学上对所有 looped 模型的统一要求。其他实现可能采用加法注入、不同初始状态、步数嵌入或部分参数共享；有效性都需要单独验证。</p>
+        <div class="inline-insight"><span>权重不动</span><p>推理时的 θ 通常固定。变化的是 s<sub>r</sub>；所以这不是“在测试时对权重做梯度更新”。这一区别与循环是否提高准确率、是否节省显存是独立问题；主页面的交互专门估算部署容量，而不模拟真实模型推理。</p></div>
+        <p class="source-note">原文：<a href="https://arxiv.org/html/2502.05171v2#S3" target="_blank" rel="noopener noreferrer">Recurrent Depth §3：架构与训练目标 ↗</a></p>
+      </section>
+
+      <section id="axes" class="section">
+        <div class="section-heading"><span class="section-number">A2 / TWO AXES</span><h2>token 往前走，状态向深处走。</h2></div>
+        <div class="two-col"><article class="card"><span class="card-kicker">序列轴 t</span><h3>自回归生成</h3><p>在已有前缀上预测下一个 token，将 token 加到上下文，再预测后续 token。文本 CoT 主要通过增加中间 token 延长这条轴。</p></article><article class="card"><span class="card-kicker">深度轴 r</span><h3>核心重复计算</h3><p>在一次 token 预测内部，把状态交给同一循环核心若干次。在这种设计中，增加轮次不要求新增文本或潜在 token 位置。</p></article></div>
+        <p>两者可以组合：对生成的每个 token 都运行多轮循环，也可以用一个循环模型生成较长的文本思维链。循环 Transformer 并不天然取消自回归，也不禁止 CoT。</p>
+        <h3>训练 / prefill 能并行，循环依然有依赖</h3>
+        <p>在完整序列训练或 prefill 中，同一轮的多个位置通常可以一起计算，但仍受因果掩码约束，不能看到未来 token。第 r + 1 轮依赖第 r 轮，因此这些深度步骤不能全部同时执行。解码时，序列轴上也通常要等前一个 token 生成完成。</p>
+        <p>默认的 Huginn 宏观公式重新初始化 s<sub>0</sub>；将上一 token 的最终状态用作下一 token 的初始状态，是论文 §6.3 额外探索的连续思维策略，不能把它误写成所有深度循环的默认行为。</p>
+      </section>
+
+      <section id="training" class="section">
+        <div class="section-heading"><span class="section-number">A3 / TRAINING</span><h2>模型得学会“反复做也有用”。</h2></div>
+        <p>普通模型的不同层通常已经各自专门化。把任意已训练层复制调用多次，并不保证它们组成稳定、有益的迭代系统。共享循环最好从训练目标、深度采样、归一化和初始化一起设计；改造现有模型也通常需要针对性训练与验证。</p>
+        <div class="equation-card"><span class="card-kicker">随机循环深度的语言建模目标</span><div class="equation">L(θ) = E<sub>x,R</sub> [ − ∑<sub>t</sub> log p<sub>θ</sub>(x<sub>t+1</sub> | x<sub>≤t</sub>; R) ]</div><p>这里用 θ 简记模型的全部可训练参数，R 从训练深度分布中采样。优化目标仍可以是下一 token 预测，并不要求每一轮都有人工标注的中间推理步骤。</p></div>
+        <ol><li><strong>在不同深度上训练。</strong>Huginn 用 log-normal Poisson 分布随机采样轮数，覆盖较浅和偶尔更深的展开。工程上每个 micro-batch 统一深度，并在并行 worker 间同步，减少等待。</li><li><strong>控制反向图长度。</strong>主实验只对最后最多 8 轮循环做反向传播，前面的轮次仍做前向。截断降低激活保存与反向计算，但前向成本仍随 R 增加。</li><li><strong>维持输入与状态信号。</strong>输入注入、归一化顺序和初始化尺度非常重要。论文记录了 token 表示坍缩，以及模型忽略传入状态、增加轮次也不改善的失败案例。</li><li><strong>检查真实的多深度表现。</strong>只看训练损失不够，还应看不同轮次的验证损失与目标任务指标，确认模型没有学成“循环一次和很多次都一样”。</li></ol>
+        <aside class="notice"><span class="notice-tag">不是免费训练</span><p>共享权重降低参数与优化器状态存储；未截断时，跨轮激活和反向传播图仍会增长。截断反传改变了梯度估计，不能等同于完整展开的精确梯度。即使只对最后几轮反传，输入 e 在这些轮次的注入仍可给 Prelude 传递梯度。</p></aside>
+        <p class="source-note">原文：<a href="https://arxiv.org/html/2502.05171v2#S3.SS3" target="_blank" rel="noopener noreferrer">§3.3 训练目标与截断反传</a>；<a href="https://arxiv.org/html/2502.05171v2#S4" target="_blank" rel="noopener noreferrer">§4 训练设置与失败尝试</a>。</p>
+      </section>
+
+      <section id="gradient-sharing" class="section">
+        <div class="section-heading"><span class="section-number">A3.1 / SHARED GRADIENTS</span><h2>同一参数用两次，训练信号就翻倍了吗？</h2></div>
+        <p>先把两次调用写成独立参数 θ₁、θ₂，令 J(θ₁, θ₂) 为展开图的样本损失。共享模型相当于施加 θ₁ = θ₂ = θ：</p>
+        <div class="equation-card"><div class="equation">∇<sub>θ</sub> J(θ, θ) = [∂J/∂θ₁ + ∂J/∂θ₂]<sub>θ₁=θ₂=θ</sub></div><p>每个位置的偏导已经包含经后续状态传播的链式项；不要再把这些梯度当作两份独立样本相加计数。完整反传如此，截断反传则会舍弃部分路径。</p></div>
+        <ul><li><strong>可能互补：</strong>不同深度的状态分布提供不同的学习需求，推动模型学会跨阶段可复用的规则。</li><li><strong>可能冲突：</strong>浅层需要提取表示，深层需要组合或校正；共享参数必须在相互不一致的梯度之间折中。</li><li><strong>不增加独立样本：</strong>训练 token 数、样本数、优化器更新次数不会因为调用两次就自动翻倍，计算量却真实增加。</li></ul>
+        <p>若架构接口和宽度相同，独立深网络可以把对应权重设成相等，因而包含共享模型的函数类。共享更可能通过降低自由度、正则化和优化路径改善有限数据下的泛化；这不与“较大函数类有更强表示能力”矛盾，也不保证所有任务都受益。</p>
+        <p>公平对照至少应覆盖：① 相同 token、同顺序、近似同 FLOPs 的共享／独立深模型；② 相同参数的浅模型；③ 相同总训练算力下，让浅模型使用更多数据的配置。多随机种子和各自合理调参可避免把超参数适配误判成架构优势。</p>
+        <p class="source-note"><a href="evidence.html#matched-data">Saunshi 等人的直接对照与限制 →</a> · <a href="index.html#reasoning">返回动机主线 →</a></p>
+      </section>
+
+      <section id="halting" class="section">
+        <div class="section-heading"><span class="section-number">A4 / ADAPTIVE COMPUTE</span><h2>停止条件，是另一项设计。</h2></div>
+        <p>“可以重复执行”与“知道何时该停”不是同一能力。固定预算最简单：所有 token 都运行 R 次。自适应预算则可能根据位置、输入或中间状态决定退出时间。</p>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="循环停止方案比较"><table><caption>常见的停止策略及其限制</caption><thead><tr><th scope="col">策略</th><th scope="col">怎么停</th><th scope="col">主要问题</th></tr></thead><tbody><tr><th scope="row">固定 R</th><td>达到预设轮数</td><td>易部署，但简单 token 也支付相同循环成本。</td></tr><tr><th scope="row">状态变化阈值</th><td>检查相邻状态的相对差异</td><td>表示可能振荡或稳定在错误答案；不同尺度需校准。</td></tr><tr><th scope="row">输出分布变化</th><td>比较相邻轮次预测分布的差异</td><td>需额外运行输出模块；低差异不保证预测正确。</td></tr><tr><th scope="row">学习停止机制</th><td>训练 halting / routing 决策</td><td>需要相应训练与预算约束；动态 batch 调度更复杂。</td></tr></tbody></table></div>
+        <p>Huginn §6.1 展示了相邻步预测分布的 KL 差异低于阈值后退出的实验；Universal Transformer 则探索过 ACT 逐位置动态停机。两者不是一套完全相同的停止算法。</p>
+        <h3>为什么“再多算一点”可能无效？</h3>
+        <p>迭代可能已经饱和，也可能进入周期或偏离有用状态；超过训练分布的深度还会发生分布偏移。真实潜在轨迹不必单调接近某个固定点。部署时应设最大轮数，并测量质量—延迟曲线，而不是假设无限循环必然提高正确率。</p>
+        <p class="source-note">原文：<a href="https://arxiv.org/html/2502.05171v2#S6.SS1" target="_blank" rel="noopener noreferrer">Recurrent Depth §6.1</a>、<a href="https://arxiv.org/html/2502.05171v2#S7" target="_blank" rel="noopener noreferrer">§7 潜在轨迹</a>；<a href="https://arxiv.org/abs/1807.03819" target="_blank" rel="noopener noreferrer">Universal Transformers</a>。</p>
+      </section>
+
+      <section id="not-diffusion" class="section">
+        <div class="section-heading"><span class="section-number">A5 / OBJECTIVES MATTER</span><h2>都有迭代，不代表同一种模型。</h2></div>
+        <div class="two-col"><article class="card"><h3>与扩散模型的区别</h3><p>扩散模型通常围绕加噪、去噪或相应生成过程构建目标。Huginn 的循环核心则用语言建模损失学习状态更新；随机初始状态不自动等于扩散噪声过程。</p></article><article class="card"><h3>与 DEQ 的区别</h3><p>深度平衡模型通常围绕固定点求解与隐式求导构建训练。有限次数显式展开、再截断反传的循环网络，不必求出固定点，也不必使用隐式梯度。</p></article></div>
+        <p>“循环”只描述结构或计算方式的一部分。模型到底学什么，还要看目标函数、状态含义、训练方法与生成过程。</p>
+      </section>
+
+      <section id="kv-cache" class="section">
+        <div class="section-heading"><span class="section-number">A6 / KV CACHE</span><h2>共享投影矩阵，不等于共享投影结果。</h2></div>
+        <div class="equation-card"><span class="card-kicker">同一核心层，不同轮次的状态</span><div class="equation">K<sub>r</sub> = H<sub>r</sub>W<sub>K</sub>, &nbsp; V<sub>r</sub> = H<sub>r</sub>W<sub>V</sub><br>H<sub>r</sub> ≠ H<sub>r+1</sub> &nbsp; ⇒ &nbsp; K、V 通常也不同</div><p>H 表示送入该注意力层投影的表示，省略归一化、位置编码等细节。共享 W<sub>K</sub>、W<sub>V</sub> 不要求不同 H 的输出相同；不同输入也可能碰巧映射为相同结果，因此这里说“通常”。</p></div>
+        <h3>固定轮数下的朴素实现</h3>
+        <p>对每个核心层、每轮迭代保存对应的历史 token K/V。新 token 在相同轮次使用历史位置的对应缓存；这保留了固定展开图的计算语义，但缓存通常随 R 增长。</p>
+        <h3>逐 token 早退为什么更复杂？</h3>
+        <p>假设前一个 token 在第 4 轮停止，当前 token 却要计算到第 12 轮，那么前一个 token 第 5–12 轮的缓存根本不存在。补算这些状态会增加成本；使用最近可用的深层缓存则改变了计算路径。</p>
+        <p>Huginn §6.1–6.2 研究了两种实用策略：缺少轮次时读取已有的最深缓存；或者设定有限缓存预算，用循环槽覆写较早轮次。论文在特定评测中报告了可行性，<strong>不是证明所有模型、任务或预算下无损</strong>。</p>
+        <aside class="notice"><span class="notice-tag">工程边界</span><p>需区分“不同轮次缓存可以近似复用”与“不同轮次 K/V 数值完全相同”。任何共享策略都必须保持因果可见性，并检查 prefill 与逐 token decode 的一致性。不能让早期位置看到未来 token。</p></aside>
+        <p class="source-note">原文：<a href="https://arxiv.org/html/2502.05171v2#S6.SS1" target="_blank" rel="noopener noreferrer">§6.1：早退与缺失缓存</a>、<a href="https://arxiv.org/html/2502.05171v2#S6.SS2" target="_blank" rel="noopener noreferrer">§6.2：循环缓存共享</a>。</p>
+      </section>
+
+      <section id="cost" class="section">
+        <div class="section-heading"><span class="section-number">A7 / BUDGET</span><h2>至少分开记四本账。</h2></div>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="资源成本模型"><table><caption>简化成本模型：核心含 k 层，循环 R 次，前后非循环部分为固定开销</caption><thead><tr><th scope="col">资源</th><th scope="col">简化关系</th><th scope="col">需要注意</th></tr></thead><tbody><tr><th scope="row">参数存储</th><td>P<sub>total</sub> = P<sub>fixed</sub> + P<sub>core</sub></td><td>共享参数不随 R 复制；不同 k、宽度与词表会改变参数量。</td></tr><tr><th scope="row">前向计算</th><td>C(R) ≈ C<sub>fixed</sub> + R × C<sub>core</sub></td><td>在序列长度等配置固定时估计；不能直接当作实际墙钟延迟。</td></tr><tr><th scope="row">激活存储</th><td>完整反向图通常随展开深度增长</td><td>checkpointing、截断反传可改变时间—内存权衡。</td></tr><tr><th scope="row">KV Cache</th><td>朴素核心缓存 ∝ R × k × T × d<sub>kv</sub></td><td>还需乘 batch、K/V 两份与每元素字节数；此处略去非循环部分。</td></tr></tbody></table></div>
+        <p>T 是缓存序列长度；d<sub>kv</sub> 是每层所有 KV 头的总维度。GQA/MQA、缓存量化与共享策略都会改变内存常数或增长方式。因此不能仅凭“参数量较小”就判断循环模型部署便宜。</p>
+        <h3>评估一个循环模型时，至少问这些问题</h3>
+        <ul><li>是在比较相同参数、相同训练 FLOPs，还是相同推理延迟？这些基线不等价。</li><li>增大 R 后，目标任务提升多少？简单任务是否很快饱和？</li><li>计入输出头、停止检测和缓存处理成本后，端到端首 token 延迟与吞吐如何？</li><li>逐位置自适应计算能否真正节省 GPU 时间，还是被 batch 中最长任务拖住？</li><li>缓存共享和深度外推是否经过独立质量评测，而不仅是少量案例？</li></ul>
+        <h3>显存容量怎样换算成并发？</h3>
+        <p>把所有量放到同一个部署池中计量。设 H 为总可用显存，O 为运行时预留，W 为独立深模型权重，αW 为循环权重，K 为基线单请求缓存，qK 为循环缓存。忽略碎片和分片不均时：</p>
+        <div class="equation-card"><div class="equation">B₁ = max(0, ⌊(H − O − W) / K⌋)<br>B₂ = max(0, ⌊(H − O − αW) / (qK)⌋)</div><p>仅在两者可部署、忽略取整时，B₂/B₁ ≈ (H − O − αW) / [q(H − O − W)]。当 q = 1，新增容量约为 (1 − α)W/K，相对增幅约为 (1 − α)W/(H − O − W)。</p></div>
+        <p>这揭示了两个不同效应：上下文增长使 K 变大，<strong>绝对新增并发下降</strong>，但在 q = 1 且忽略取整时，相对容量增幅不因此改变；如果权重只占总预算很小一部分，则相对增幅本来就小。不要把“KV 主导”简单改写成“省参数毫无价值”。</p>
+        <p>主页面默认 H = 160 GiB、O = 16 GiB、W = 96 GiB、α = 0.5、K = 1 GiB、q = 1，得到 48 → 96。若 K = 4 GiB，则是 12 → 24；若 q = 2 且 K = 1 GiB，则是 48 → 48。跨设备池还必须逐设备检查驻留瓶颈，不能把所有显存无损相加。</p>
+        <h3>容量并发不等于有效吞吐</h3>
+        <p>主页面用 T(B)/T∞ = B/(B+Bₛ) 仅示意批处理收益递减：默认 Bₛ = 32 时，48 → 96 只把同一假设曲线上的吞吐从 60% 推到 75%。两种架构实际并不一定共用 T∞ 或 Bₛ；增加循环、缓存读取与动态调度都能改变它们。</p>
+        <p>生产上应测目标请求分布、prompt / output 长度、p95 首 token 延迟和逐 token 延迟约束下的 goodput。更多并发还可能只是让更多请求占住服务资源或排队，而非提升单位时间完成数。</p>
+        <p><a class="note-link" href="index.html#playground">回到显存与并发估算器 ↗</a> <a class="note-link" href="evidence.html#results">继续阅读实验比较的边界 ↗</a></p>
+      </section>
+
+      <section id="hardware-budget" class="section">
+        <div class="section-heading"><span class="section-number">A7.1 / HARDWARE CODESIGN</span><h2>“只扩计算、不扩参数”何时值得？</h2></div>
+        <p><a href="https://www.cerebras.ai/blog/introducing-cerebras-inference-ai-at-instant-speed" target="_blank" rel="noopener noreferrer">Cerebras 2024-08-27 的官方介绍</a>给出 WSE-3 单片 44 GB SRAM，并说明超过单片容量的模型按层映射到多个 CS-3。该厂商规格是十进制 GB；主页面估算使用二进制 GiB，二者不要混算。片上 SRAM 加计算单元也不等于存储阵列内乘加。</p>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="硬件协同设计的验证条件"><table><thead><tr><th scope="col">假说</th><th scope="col">需要验证</th><th scope="col">可能的反作用</th></tr></thead><tbody><tr><th scope="row">小核心更易片上驻留</th><td>权重 + KV + 激活 + 缓冲能否同时满足片上容量、布局与带宽约束。</td><td>不能只用参数数 × 精度推断能否放下一份完整服务实例。</td></tr><tr><th scope="row">减少权重搬运</th><td>同一核心在两轮之间是否真能驻留；需量测实际字节流量。</td><td>GPU 上大核心可能每轮重读 HBM，存储副本减少不等于流量减少。</td></tr><tr><th scope="row">减少跨设备切分</th><td>循环后能否少用设备或减少边界通信，并比较相同质量。</td><td>独立层流水线可承载不同请求；循环重入也会引入争用和负载不均。</td></tr><tr><th scope="row">利用富余算力</th><td>额外循环是否落在容量／带宽受限而算力有余的区间。</td><td>计算不会自动免费；串行关键路径、KV 访存和能耗仍可能增长。</td></tr></tbody></table></div>
+        <p>这是一套可检验的设计逻辑，不是 Cerebras 或 OpenAI 已按此设计某模型的事实。要证明 codesign 优势，至少同时报告质量、设备数、峰值内存、真实吞吐、时延和能耗，并与适配相同硬件的独立层基线比较。</p>
+        <p><a href="index.html#hardware">返回硬件动机讨论 →</a></p>
+      </section>
+      <nav class="back-card" aria-label="专题页间导航"><a href="index.html">← 返回 Looped Transformer 主页面</a><a href="evidence.html">补充 B：论文与证据边界 →</a></nav>
+    </main>
+    <footer><span>LLM LEARNING NOTES / TECHNICAL NOTES</span><span>主要依据：Recurrent Depth v2（2025）</span><a href="#equations">回到顶部 ↑</a></footer>
+  </div>
+</body>
+</html>

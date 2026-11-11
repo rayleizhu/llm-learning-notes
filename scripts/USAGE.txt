@@ -1,0 +1,90 @@
+交互式 HTML 教程：收录与发布
+==========================
+
+环境
+  Python 3.10+，仅使用标准库，无需 pip 或 npm 安装。
+  GitHub Actions 使用 Python 3.11。
+
+日常命令（在项目根目录运行）
+  python3 scripts/build_site.py --serve
+    构建并预览 http://127.0.0.1:8000/；可通过 --port 8001 更换端口。
+    没有文件监听；修改后 Ctrl+C，再运行一次即可更新。
+  python3 scripts/build_site.py --check
+    只检查，不写发布目录。
+  python3 scripts/build_site.py
+    生成 _site/，这是应发布的完整站点。
+  python3 -m unittest discover -s scripts -p 'test_*.py' -v
+    运行构建器回归测试。
+
+源文件和生成文件
+  根 index.html 是书籍目录模板；assets/home.css 控制目录外观。
+  不要手工维护章节列表，构建时会替换 CATALOG 标记之间的内容。
+  预览 _site/index.html，而不是直接浏览源码根目录的模板。
+  _site/ 是构建产物，不提交 Git；每次成功构建会重新生成。
+  构建检查失败时，不替换原 _site/；线上部署同样不会继续。
+  章节 HTML/CSS/JS 原样复制，不被套入博客主题或转换成 Markdown。
+
+新增章节（也适用于让 AI 自动完成）
+  1. 在 core_chapters/<目录名>/ 或 special_topics/<目录名>/ 生成教程。
+     分类下面一层目录就是一个章节，不使用嵌套的章节元数据目录。
+  2. 生成 index.html、所需 CSS/JS/媒体文件和 course.json。
+  3. course.json 参照已有章节和 scripts/course.schema.json：
+     title        必填，完整章节标题。
+     order        必填，整数，同分类内从小到大排序；建议 10、20、30 留出插入空间。
+     published    必填，true 发布，false 草稿。
+     description  可选，一句话简介。
+     entry        可选，默认 index.html。
+     supplements  可选，补充阅读数组，每项提供 title 和 path。
+                  path 相对章节目录，可带锚点，如 notes.html#derivation。
+     extra_files  可选，明确批准发布的额外文件路径数组。
+  4. 页面使用相对路径；每章入口保留 ../../index.html 返回目录链接。
+  5. 运行 --serve 检查交互，确认无误后提交并推送源码到 main。
+
+可直接交给 AI 的约定
+  请在指定分类下创建独立交互式 HTML 教程，并创建或更新 course.json。
+  保留自由的布局、图表和交互；无需 Markdown、框架或公共正文模板。
+  使用相对资源路径，为主页面增加返回 ../../index.html 的链接。
+  先设 published=false；准备上线时明确改为 true。
+  同步登记补充阅读和 JS 运行时依赖，不手改首页的自动目录。
+  完成后运行 python3 scripts/build_site.py --check。
+
+收集与检查的边界
+  自动收集：入口、补充页及其 HTML/CSS 静态引用的网页资源，
+  包括 href/src/poster/srcset、内联样式、CSS url() 和常见 @import。
+  只有已发布章节目录和公共 assets/ 内的依赖可进入产物。
+  未被引用的文件不会因为放在章节目录里就被自动上传。
+  没有 course.json 的目录不收录；存在 index.html 时会打印警告。
+  已发布页面链接到草稿或未登记章节会报错，不会顺带发布草稿。
+  JSON/CSV/下载资料等需要在所属章节的 extra_files 中明确登记。
+  JS 中的 fetch、import、Worker、动态生成 URL 不执行也不自动解析；
+  这些资源及其间接依赖必须逐个加入 extra_files，再用浏览器验证。
+  extra_files 是准确的相对文件名，不支持通配符、父目录或绝对路径。
+  字体许可随字体一起发布，例如现有章节的 fonts/OFL.txt。
+  不验证外部网站是否可用、动态锚点是否存在、公式或交互逻辑是否正确。
+  CSS 引用扫描支持常见 url()/@import 写法，不是完整 CSS/JS 打包器。
+  根路径 /assets/...、file://、localhost 引用、隐藏文件、符号链接会拒绝。
+  构建器不替你审查已公开 HTML/JS 内嵌的敏感内容，仍需人工确认。
+
+GitHub 首次配置（网页端完成一次）
+  1. 创建仓库，将本项目源码上传到 main；包括 .github/workflows/pages.yml。
+     当前工具不代替你初始化 Git、提交或创建远程仓库。
+     不上传 _site/、.codebuddy/、浏览器日志、密钥或私人资料。
+  2. 仓库 Settings → Pages → Build and deployment → Source：GitHub Actions。
+     不再选择 Deploy from a branch，否则会直接发布首页模板而非生成目录。
+  3. 仓库 Actions → Build and publish tutorials → Run workflow，选择 main；
+     或配置完成后再次推送到 main。
+  4. 查看 build/deploy 结果，成功地址显示在 Pages 和 github-pages 环境中。
+  5. 若分支名不是 main，同时修改工作流的 push、pull_request 分支和两个
+     refs/heads/main 条件，并检查 github-pages 环境的部署分支限制。
+  6. 不需要个人访问令牌，工作流使用 GitHub 自带的权限和 OIDC。
+     组织策略或环境审批可能需要仓库管理员调整。
+
+持续发布
+  推送 main → 回归测试 → 收录/依赖检查 → 上传 _site/ → 部署。
+  PR 只运行测试与构建，不部署；手动发布也仅允许 main。
+  删除章节或设置 published=false 后，下一次成功发布会移除旧页面。
+  发布失败可在 Actions 日志查看原因，再修复和推送；无需手动上传产物。
+  published=false 只控制网站发布，不是隐私保护：公开仓库里的源码仍可见。
+
+官方资料
+  https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages

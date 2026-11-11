@@ -1,0 +1,10 @@
+{
+  "$schema": "../../scripts/course.schema.json",
+  "title": "DeepSeek-V4.1 · 模型架构与关键技术",
+  "description": "从层结构与 KV Cache 压缩，理解模型和系统的协同设计。",
+  "order": 10,
+  "published": true,
+  "entry": "index.html",
+  "supplements": [],
+  "extra_files": []
+}

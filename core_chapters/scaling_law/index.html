@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="从两个层次理解大模型预训练 Scaling Law：先拟合资源与 loss 的关系，再求给定预算下的最优模型大小、训练 token 数与最低预测 loss。">
+  <meta name="color-scheme" content="light dark">
+  <title>Scaling Law · 大模型预训练的规模法则</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='10' fill='%234f8cff'/%3E%3Cpath d='M9 11v20h23M13 15l6 8 6 3 6 1' fill='none' stroke='%23fff' stroke-width='2.5'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳至正文</a>
+  <div class="page-layout">
+    <aside class="sidebar" aria-label="章节导航">
+      <p class="sidebar-subtitle"><a href="../../index.html">← 教程总目录</a></p>
+      <a class="brand" href="#overview"><span>Scaling Law</span> 解读</a>
+      <p class="sidebar-subtitle">大模型预训练 · 参数、数据与算力</p>
+      <button class="theme-toggle" type="button" aria-label="切换到浅色模式" aria-pressed="true">切换 <span>浅色</span> 主题</button>
+      <div class="sidebar-heading"><span class="eyebrow">本章目录</span><span class="chapter-mark">两个层次</span></div>
+      <nav class="toc">
+        <a href="#overview" class="active" aria-current="location"><span>导览</span>先描述规律，再做最优分配</a>
+        <a href="#power-law"><span>01</span>第一层：资源如何影响 loss</a>
+        <a href="#compute-optimal"><span>02</span>第二层：固定预算求最优</a>
+        <a href="#lab" class="toc-child"><span>2.1</span>实验：三个最优答案<i class="nav-dot" aria-hidden="true"></i></a>
+        <a href="#chinchilla" class="toc-child"><span>2.2</span>论文：最优配比的演进</a>
+        <a href="#practice"><span>应用</span>从拟合到训练决策</a>
+        <a href="#references"><span>资料</span>回到原始论文</a>
+      </nav>
+      <div class="sidebar-note"><span class="eyebrow">DEEP DIVE</span><button class="note-trigger" type="button" data-note="measurement">推导与边界条件 <span aria-hidden="true">↗</span></button><p>点击展开补充说明，不离开正文。</p></div>
+      <div class="reading-progress"><span>阅读进度 <output id="reading-percent">0%</output></span><div class="progress-track"><div id="reading-bar"></div></div></div>
+      <p class="sidebar-bottom">理解规律，而不只是记住比例。</p>
+    </aside>
+    <main id="main">
+      <div class="breadcrumb"><span>核心章节</span><span aria-hidden="true">/</span><span>模型预训练</span><span aria-hidden="true">/</span><strong>Scaling Law</strong></div>
+      <section id="overview" class="hero">
+        <div class="hero-copy">
+          <div class="eyebrow accent"><span class="status-dot" aria-hidden="true"></span> THE SCIENCE OF SCALING</div>
+          <h1>Scaling Law<span>大模型预训练的<span class="title-accent">规模法则</span></span></h1>
+          <p class="hero-lead">先问：资源规模如何影响 loss？<br>再问：固定预算，怎样分配才能让 loss 最低？</p>
+          <div class="hero-meta"><span>约 15 分钟</span><span>2 个交互实验</span><span>描述规律 → 最优分配</span></div>
+          <a class="button primary" href="#power-law">从第一层开始 <span aria-hidden="true">↓</span></a><a class="text-button" href="#compute-optimal">查看最优分配 <span aria-hidden="true">↗</span></a>
+        </div>
+        <div class="hero-visual" aria-label="规模越大，损失越低，但边际收益递减的示意图">
+          <div class="visual-title"><span>MORE SCALE. LESS LOSS.</span><span class="mini-pill">经验规律</span></div>
+          <svg viewBox="0 0 430 255" role="img" aria-labelledby="hero-chart-title">
+            <title id="hero-chart-title">幂律示意：随着资源增加，损失逐渐下降并接近一个下限。不是实测数据。</title>
+            <defs><linearGradient id="hero-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#428568" stop-opacity=".22"/><stop offset="100%" stop-color="#428568" stop-opacity="0"/></linearGradient></defs>
+            <g class="chart-grid"><path d="M46 46H406M46 94H406M46 142H406M46 190H406M106 30V217M178 30V217M250 30V217M322 30V217M394 30V217"/></g>
+            <path d="M46 38C61 91 83 124 112 144S174 173 228 185S330 197 400 202V218H46Z" fill="url(#hero-fill)"/>
+            <path d="M46 38C61 91 83 124 112 144S174 173 228 185S330 197 400 202" fill="none" stroke="var(--accent)" stroke-width="3"/>
+            <path d="M46 214H406" stroke="var(--muted)" stroke-dasharray="4 5" opacity=".6"/>
+            <g fill="var(--surface)" stroke="var(--accent)" stroke-width="2.5"><circle cx="64" cy="87" r="4.5"/><circle cx="112" cy="144" r="4.5"/><circle cx="228" cy="185" r="4.5"/><circle cx="359" cy="199" r="4.5"/></g>
+            <g class="chart-text"><text x="15" y="32">Loss</text><text x="334" y="245">规模 / Scale →</text><text x="310" y="231">不可约损失下限</text></g>
+            <rect x="188" y="69" width="195" height="44" rx="8" fill="var(--surface)" stroke="var(--line)"/><text x="285" y="97" text-anchor="middle" class="hero-equation">L(x) = E + Ax⁻ᵅ</text>
+          </svg>
+          <div class="visual-footer"><span><i class="legend-dot green"></i>损失随规模平滑下降</span><span>趋势示意，非实测</span></div>
+        </div>
+      </section>
+      <div class="takeaway"><span class="takeaway-label">一句话理解</span><p><strong>Scaling Law 描述资源与损失的关系；计算最优 Scaling Law 利用这种关系，求给定预算下的最佳分配与最低损失。</strong>后者是前者的一种应用，不是全部。</p></div>
+      <div class="learning-map" aria-label="本章的两个层次">
+        <a class="learning-step" href="#power-law"><span class="eyebrow">第一层 · DESCRIBE</span><h2>描述规律</h2><p>给定模型大小 N 与训练 token 数 D，预测 loss 如何变化。</p><span class="learning-output">输入 N、D → 预测 L̂(N, D)</span></a>
+        <a class="learning-step" href="#compute-optimal"><span class="eyebrow">第二层 · OPTIMIZE</span><h2>做最优分配</h2><p>给定训练预算 C，在可行配置中寻找预测 loss 最低的一组。</p><span class="learning-output">输入 C → N<sub>opt</sub>、D<sub>opt</sub>、L̂<sub>min</sub>(C)</span></a>
+      </div>
+      <div class="resource-grid">
+        <article class="resource-card"><div class="resource-head"><span class="variable green-text">N</span><span class="eyebrow">PARAMETERS</span></div><h3>参数量</h3><p>模型的容量。更大的模型通常能更有效地吸收数据，但每个 token 的计算也更贵。</p><span class="resource-unit">单位：参数 · 1B = 10 亿</span></article>
+        <article class="resource-card"><div class="resource-head"><span class="variable blue-text">D</span><span class="eyebrow">TRAINING TOKENS</span></div><h3>训练数据量</h3><p>训练过程中处理的 token 总数。这里不是文档数，也不能把重复数据当作等量新信息。</p><span class="resource-unit">单位：token · 1T = 1 万亿</span></article>
+        <article class="resource-card"><div class="resource-head"><span class="variable orange-text">C</span><span class="eyebrow">COMPUTE</span></div><h3>训练计算量</h3><p>完成训练所需的浮点运算总量。对稠密 Transformer，常用近似连接前两个变量。</p><span class="resource-unit formula-inline">C ≈ 6ND <button class="note-trigger" type="button" data-note="compute" aria-label="补充说明：6ND 从哪里来">[补充 ↗]</button></span></article>
+      </div>
+
+      <section id="power-law" class="content-section">
+        <div class="section-heading"><span class="section-number">01</span><div><span class="eyebrow">LAYER 1 · DESCRIBE THE RELATIONSHIP</span><h2>第一层：资源规模如何影响 loss？</h2></div></div>
+        <p class="section-intro">这一层先不问预算怎么分，而是用实验描述：在数据分布、架构、训练方法与评测口径可比时，给定 N 和 D，最终 loss 大约是多少？</p>
+        <h3 class="subsection-heading">1.1 从实验拟合资源与损失的关系</h3>
+        <p class="section-intro">Chinchilla 风格的一种联合经验模型如下。帽子符号 L̂ 表示预测值，E、A、B、α、β 都依赖实验设置，不是通用常数。</p>
+        <div class="formula-panel"><div class="formula" role="math" aria-label="预测损失等于 E 加 A 除以 N 的 alpha 次方，加 B 除以 D 的 beta 次方">L̂(N, D) = E + <span class="frac"><span>A</span><span>N<sup>α</sup></span></span> + <span class="frac"><span>B</span><span>D<sup>β</sup></span></span></div><div class="formula-key"><span>E：拟合的渐近下限</span><span>A/N<sup>α</sup>：模型容量限制项</span><span>B/D<sup>β</sup>：数据 / 训练不足项</span></div></div>
+        <div class="two-column concept-columns"><div><h3>固定 D，增加 N</h3><p>参数项降低，预测 loss 下降；但数据项仍然存在，不能只靠扩大模型消除它。</p></div><div><h3>固定 N，增加 D</h3><p>数据项降低，预测 loss 下降；但容量限制仍然存在，持续多读数据的收益会递减。</p></div></div>
+        <p class="section-intro"><strong>这一层的输出是一个关系函数，而不是一个最优配置。</strong>如果没有预算或其他约束，该模型倾向于让 N、D 都继续增大；要回答“多大最合适”，还需要第二层。</p>
+        <h3 class="subsection-heading">1.2 用单个方向的曲线理解幂律</h3>
+        <p class="section-intro">先固定另一个变量，观察一个资源方向。用 x 表示变化的规模、α 表示该方向的指数，曲线可简写为：</p>
+        <div class="formula-panel"><div class="formula" role="math" aria-label="L of x 等于该切片的下限 E x 加 A 乘 x 的负 alpha 次方">L(x) = E<sub>x</sub> + Ax<sup>−α</sup></div><div class="formula-key"><span>x：某一种资源规模</span><span>E<sub>x</sub>：该曲线的有效下限</span><span>A, α &gt; 0：拟合系数</span></div></div>
+        <p class="fine-print">例如固定 D 改变 N 时，E<sub>x</sub> = E + B/D<sup>β</sup>，不等于联合模型中的 E。改变 D 的方向则对应指数 β。下方滑块只用于说明幂律，不改变第二层计算器的论文拟合系数。</p>
+        <div class="two-column concept-columns"><div><h3>规律可预测，收益会递减</h3><p>定义相对此曲线下限的可约损失 ΔL = L − E<sub>x</sub>。资源扩大 k 倍，ΔL 变成原来的 k<sup>−α</sup> 倍；同样的倍数增长带来相同的<strong>相对改善</strong>，但绝对降幅越来越小。</p><p>例如 α = 0.30 时，资源翻倍只让可约损失下降约 <strong>19%</strong>，而不是让模型“聪明一倍”。</p></div><div><h3>直线来自坐标，而非线性收益</h3><p>两边取对数：log ΔL = log A − α log x。在双对数坐标中，这就是一条斜率为 −α 的直线。</p><p>有非零下限时，应该画 <strong>L − E<sub>x</sub></strong>，而不是默认总损失 L 在 log-log 图中也是直线。</p></div></div>
+        <div class="interactive-card power-card">
+          <div class="card-heading"><div><span class="lab-badge">交互 01</span><h3>换一个坐标，看同一个规律</h3></div><div class="segmented" role="group" aria-label="图表坐标系"><button type="button" data-scale="linear" aria-pressed="true">线性坐标</button><button type="button" data-scale="log" aria-pressed="false">双对数坐标</button></div></div>
+          <div class="power-chart-wrap"><svg id="power-chart" class="interactive-chart" viewBox="0 0 780 270" role="img" aria-labelledby="power-title power-desc"><title id="power-title">可约损失的幂律曲线</title><desc id="power-desc">教学函数 ΔL = x 的负 0.30 次方，横轴为相对资源，纵轴为可约损失。</desc></svg></div>
+          <div class="power-controls"><label for="alpha">幂律指数 α <output id="alpha-value" for="alpha">0.30</output></label><input type="range" id="alpha" min="0.10" max="0.60" step="0.01" value="0.30"><p id="power-result" aria-live="polite">资源 ×10 → 可约损失下降 49.9%</p></div>
+          <p class="chart-caption">教学函数：ΔL = x<sup>−α</sup>，x ∈ [1, 100]。指数可调，不是某篇论文的实测曲线。</p>
+        </div>
+        <button class="detail-link note-trigger" type="button" data-note="measurement"><span class="note-index">A</span><span><strong>这里的 loss 到底是什么？</strong> 交叉熵、困惑度与评测口径</span><span aria-hidden="true">↗</span></button>
+      </section>
+
+      <section id="compute-optimal" class="content-section">
+        <div class="section-heading"><span class="section-number">02</span><div><span class="eyebrow">LAYER 2 · OPTIMIZE UNDER A BUDGET</span><h2>第二层：固定预算，怎样让 loss 最低？</h2></div></div>
+        <p class="section-intro">现在把第一层拟合好的 L̂(N, D) 当作目标函数，给定训练计算预算 C。对稠密模型采用 C<sub>train</sub> ≈ 6ND 的近似，只在预算允许的配置里找最小值。</p>
+        <div class="formula-panel optimization-problem"><div class="formula" role="math" aria-label="最优参数量与数据量是在 N D 大于零且 6ND 不超过预算 C 的条件下，使预测损失最小的一组">(N<sub>opt</sub>, D<sub>opt</sub>) = <span class="operator-stack"><span>arg min</span><small>N,D &gt; 0; 6ND ≤ C</small></span> L̂(N, D)</div><div class="formula" role="math" aria-label="预算 C 下的最低预测损失等于最优参数与数据配置处的预测损失">L̂<sub>min</sub>(C) = L̂(N<sub>opt</sub>, D<sub>opt</sub>)</div></div>
+        <p class="section-intro">因此答案有三个：<strong>模型应该多大、训练 token 应该多少、最低预测 loss 是多少。</strong>在这个正系数、连续规模的简化模型里，最优解用满预算，所以可令 D = C/(6N)，把问题变成沿固定算力曲线寻找谷底。</p>
+        <div class="callout"><strong>注意：“最低 loss”有条件</strong><p>L̂<sub>min</sub>(C) 是当前拟合函数在预算约束下的最小值，不是无条件保证的真实训练结果；它也不是联合模型的渐近下限 E。换数据分布、训练方法或模型架构，应重新校准第一层的关系。</p></div>
+        <section id="lab" class="chapter-subsection">
+        <h3 class="subsection-heading">2.1 交互实验：一笔预算，三个最优答案</h3>
+        <p class="section-intro">先调整预算，看 N<sub>opt</sub>、D<sub>opt</sub> 与 L̂<sub>min</sub> 怎样变化；再保持预算不变，偏离最优参数量，观察当前 loss 为什么升高。第一层负责算出曲线上的每个点，第二层负责选出最低的那个点。</p>
+        <div class="interactive-card allocation-lab">
+          <div class="card-heading"><div><span class="lab-badge">交互 02</span><h3>寻找 IsoFLOP 曲线的谷底</h3></div><span class="simulation-tag">论文拟合 · 非训练实测</span></div>
+          <div class="lab-layout">
+            <div class="lab-controls">
+              <div class="control-group"><label for="compute">训练计算预算 C</label><output class="control-value" id="compute-value" for="compute">1.00 × 10²² <small>FLOPs</small></output><input type="range" id="compute" min="20" max="25" step="0.05" value="22"><div class="range-ends"><span>10²⁰</span><span>10²⁵ FLOPs</span></div><div class="preset-buttons" role="group" aria-label="计算预算预设"><button type="button" data-budget="21">10²¹</button><button type="button" data-budget="22" aria-pressed="true">10²²</button><button type="button" data-budget="23">10²³</button></div></div>
+              <div class="control-group"><label for="model-ratio">参数量 / 拟合最优参数量</label><output class="control-value" id="ratio-value" for="model-ratio">1.00×</output><input type="range" id="model-ratio" min="-1" max="1" step="0.02" value="0"><div class="range-ends"><span>0.1× · 小模型</span><span>10× · 大模型</span></div></div>
+              <button class="button reset-button" id="reset-optimal" type="button">回到拟合最优点 <span aria-hidden="true">↺</span></button>
+              <p class="control-hint">拖动滑块，或聚焦后用方向键调整。预算固定时，N 增大将使 D 按反比例减小。</p>
+            </div>
+            <div class="lab-chart-panel"><div class="chart-topline"><span>预测交叉熵 L̂ <small>↓ 越低越好</small></span><span class="mono">IsoFLOP</span></div><svg id="allocation-chart" class="interactive-chart" viewBox="0 0 620 320" role="img" aria-labelledby="allocation-title allocation-desc"><title id="allocation-title">固定算力下的参数量与预测损失</title><desc id="allocation-desc">U 形曲线的谷底是拟合最优点，橙色圆点表示当前分配。</desc></svg><div class="chart-legend"><span><i class="legend-line"></i>预测损失</span><span><i class="legend-dot green"></i>拟合最优</span><span><i class="legend-dot orange"></i>当前分配</span></div></div>
+          </div>
+          <div class="optimal-summary" aria-live="polite" aria-atomic="true">
+            <h4>该预算下的三个最优答案 · 当前拟合模型</h4>
+            <div class="optimal-answers">
+              <div><span>最优模型大小 N<sub>opt</sub></span><output id="optimal-n" for="compute">—</output><small>参数量</small></div>
+              <div><span>最优数据量 D<sub>opt</sub></span><output id="optimal-d" for="compute">—</output><small>训练 tokens</small></div>
+              <div><span>最低预测 loss L̂<sub>min</sub></span><output id="optimal-loss" for="compute">—</output><small>nats/token · 不是下限 E</small></div>
+            </div>
+          </div>
+          <div class="lab-results" aria-live="polite" aria-atomic="true"><div><span>当前参数量 N</span><strong id="result-n">—</strong><small>由参数量滑块选择</small></div><div><span>当前训练 tokens D</span><strong id="result-d">—</strong><small>D = C / (6N)</small></div><div><span>当前预测 loss L̂</span><strong id="result-loss">—</strong><small id="loss-gap">相对最优 —</small></div><div><span>当前 Tokens / parameter</span><strong id="result-ratio">—</strong><small>并非固定为 20</small></div></div>
+          <p class="lab-verdict" id="lab-verdict" role="status">正在计算拟合结果…</p>
+          <div class="lab-footnote"><strong>模型假设</strong><p>采用 Chinchilla 附录 D.2 的舍入系数：E = 1.69，A = 406.4，B = 410.7，α = 0.34，β = 0.28；N、D 代入原始数量而非 B/T。输出是该历史拟合的演示，不是你的训练 loss 预测。高预算部分属于外推。</p><button class="note-trigger" type="button" data-note="derivation">查看最优解推导与 20:1 近似的区别 ↗</button></div>
+        </div>
+        <noscript><p class="callout">交互实验与补充说明弹窗需要启用 JavaScript。核心结论：固定 C 时，D = C/(6N)；模型与数据项之间的权衡形成损失谷底。正文仍可正常阅读。</p></noscript>
+        </section>
+        <div class="optimal-scaling">
+          <h3 class="subsection-heading">把每笔预算的最优点连起来，会得到什么？</h3>
+          <p class="section-intro">对第一层的联合幂律模型求解，可得到最优资源分配与最低损失随预算变化的规律：</p>
+          <div class="formula-panel"><div class="formula" role="math" aria-label="最优参数量正比于 C 的 beta 除以 alpha 加 beta 次方，最优数据量正比于 C 的 alpha 除以 alpha 加 beta 次方">N<sub>opt</sub> ∝ C<sup>β/(α+β)</sup> &nbsp; D<sub>opt</sub> ∝ C<sup>α/(α+β)</sup></div><div class="formula" role="math" aria-label="最低预测损失减去 E 正比于 C 的负 alpha beta 除以 alpha 加 beta 次方">L̂<sub>min</sub>(C) − E ∝ C<sup>−αβ/(α+β)</sup></div></div>
+          <p class="fine-print">这条 loss–compute 曲线要求每笔预算都重新选择最优 N 与 D，不是固定模型只延长训练。比例常数仍由 A、B 等系数决定；只知道指数，不能算出绝对的模型大小或最低 loss。</p>
+          <button class="detail-link note-trigger" type="button" data-note="derivation"><span class="note-index">C</span><span><strong>这三个结果是怎样求出来的？</strong> 从预算约束到最优点与最低损失</span><span aria-hidden="true">↗</span></button>
+        </div>
+        <section id="chinchilla" class="chapter-subsection">
+          <h3 class="subsection-heading">2.2 从 Kaplan 到 Chinchilla：最优配比的演进</h3>
+          <p class="section-intro">两篇论文都研究资源与 loss 的关系，也都讨论计算最优分配。下面比较的是<strong>第二层的最优路径</strong>，不是说 Kaplan 只研究第一层、Chinchilla 才研究第二层。</p>
+          <div class="takeaway"><span class="takeaway-label">关键突破</span><p>Chinchilla 并非首次提出 Scaling Law，而是<strong>改进第一层的实验与拟合，修正第二层的模型—数据配比，并用大规模训练验证：同样的预算，更小但训练更多 token 的模型可以更强。</strong></p></div>
+          <button class="detail-link note-trigger" type="button" data-note="chinchilla-breakthrough"><span class="note-index">G</span><span><strong>Chinchilla 为什么成为标志性工作？</strong> 与 Kaplan 的区别、实验改进、大规模验证与结论边界</span><span aria-hidden="true">↗</span></button>
+          <div class="comparison-grid">
+            <article class="comparison-card"><div class="comparison-top"><span class="year">2020</span><a href="https://arxiv.org/abs/2001.08361" target="_blank" rel="noopener noreferrer">原始论文 ↗</a></div><h3>Kaplan et al.</h3><p class="comparison-subtitle">更偏向扩大模型</p><div class="formula compact">N<sub>opt</sub> ∝ C<sup>0.73</sup><br>D<sub>opt</sub> ∝ C<sup>0.27</sup></div><p>在其设置下，更大的模型具有更高样本效率；计算最优不意味着先把模型训练到充分收敛。</p><div class="comparison-bottom">算力 ×10 <span>参数约 ×5.4 · token 约 ×1.9</span></div></article>
+            <article class="comparison-card highlighted"><div class="comparison-top"><span class="year">2022</span><a href="https://arxiv.org/abs/2203.15556" target="_blank" rel="noopener noreferrer">原始论文 ↗</a></div><h3>Hoffmann et al. <span class="small-tag">Chinchilla</span></h3><p class="comparison-subtitle">模型与数据大致同步扩展</p><div class="formula compact">N<sub>opt</sub> ∝ C<sup>≈0.5</sup><br>D<sub>opt</sub> ∝ C<sup>≈0.5</sup></div><p>系统改变模型大小与训练长度，发现当时许多大模型对给定预算而言偏大、训练 token 偏少。</p><div class="comparison-bottom">算力 ×10 <span>参数约 ×3.2 · token 约 ×3.2</span></div></article>
+          </div>
+          <p class="fine-print">指数对比见 Chinchilla 论文表 2。其三种方法分别给出参数/数据指数 0.50/0.50、0.49/0.51、0.46/0.54；“各一半”是概括，不是精确常数。两篇论文的实验与拟合方法不同，不应把 Kaplan 的指数直接代入上面的 Chinchilla 联合模型。</p>
+          <div class="case-study"><div><span class="eyebrow accent">THE CHINCHILLA EXAMPLE</span><h3>70B 参数，1.4T tokens</h3><p>相较 280B 的 Gopher，Chinchilla 用约四分之一的参数、更多的训练 token，在论文所报告的相近训练计算预算下，取得更好的多项评测结果。</p></div><div class="case-ratio"><strong>≈ 20</strong><span>tokens / parameter</span><small>这个案例的比例，不是普适配方</small></div></div>
+          <div class="callout"><strong>“20 tokens / parameter”该怎么用？</strong><p>它是 Chinchilla 风格计算最优的常见粗略起点，不是数据上限，也不代表模型收敛。若目标是低推理成本，较小模型训练更多 token 可能更合算。</p><button class="note-trigger" type="button" data-note="ratio">为什么 20:1 不是定律？ ↗</button></div>
+        </section>
+      </section>
+
+      <section id="practice" class="content-section">
+        <div class="section-heading"><span class="section-number">应用</span><div><span class="eyebrow">FROM FITTING TO DECISION</span><h2>先校准第一层，再使用第二层</h2></div></div>
+        <p class="section-intro">最优配置是否可信，首先取决于资源与 loss 的关系是否拟合可靠。实际训练时，把两个层次落实为下面四步。</p>
+        <div class="workflow"><article><span>第一层 · 01</span><h3>固定评测口径</h3><p>确定语料混合、分词器、上下文长度、验证集与 loss 单位，避免把口径变化当成规模收益。</p></article><article><span>第一层 · 02</span><h3>拟合资源与损失</h3><p>用 N × D 实验网格拟合 L̂(N,D)，匹配学习率调度，并用留出实验检查残差和外推误差。</p></article><article><span>第二层 · 03</span><h3>加入预算，求三个答案</h3><p>指定 C，求 N<sub>opt</sub>、D<sub>opt</sub> 与 L̂<sub>min</sub>(C)。围绕候选配置做验证，不把预测当保证。</p></article><article><span>第二层 · 04</span><h3>补齐实际约束</h3><p>加入数据、显存、吞吐与推理需求。目标或约束改变时，重新求解；训练最优不等于部署最优。</p></article></div>
+        <button class="detail-link note-trigger" type="button" data-note="experiments"><span class="note-index">E</span><span><strong>怎样拟合自己的第一层规律？</strong> 实验网格、评测口径、调度与外推验证</span><span aria-hidden="true">↗</span></button>
+        <div class="two-column boundaries"><article class="boundary-card"><span class="eyebrow accent">IT TELLS YOU</span><h3>它能告诉你的</h3><ul><li>可比设置下，资源增长的预期收益。</li><li>固定预算内，模型与数据的候选配比。</li><li>为什么更大的模型并不总是更划算。</li></ul></article><article class="boundary-card"><span class="eyebrow orange-text">IT DOES NOT GUARANTEE</span><h3>它不保证的</h3><ul><li>更低的平均 loss 必然改善每项下游能力。</li><li>重复数据、合成数据与新数据等价。</li><li>稠密模型的系数可直接套用到 MoE。</li></ul></article></div>
+        <button class="detail-link note-trigger" type="button" data-note="deployment"><span class="note-index">B</span><span><strong>为什么很多小模型会训练远超 20N 的 token？</strong> 训练最优 ≠ 全生命周期最优</span><span aria-hidden="true">↗</span></button>
+        <div class="knowledge-check"><span class="eyebrow">QUICK CHECK</span><h3>算力增加 4 倍。按 N、D 各随 C<sup>0.5</sup> 增长，应怎样分配？</h3><div class="quiz-options" role="group" aria-label="选择算力分配方案"><button type="button" data-answer="model">参数 ×4，数据不变</button><button type="button" data-answer="balanced">参数 ×2，数据 ×2</button><button type="button" data-answer="both">参数 ×4，数据 ×4</button></div><p id="quiz-feedback" role="status">选一个方案，检验你对 6ND 的理解。</p></div>
+      </section>
+
+      <section id="references" class="content-section references-section">
+        <div class="section-heading"><span class="section-number">资料</span><div><span class="eyebrow">READ THE ORIGINALS</span><h2>回到原始资料</h2></div></div>
+        <p class="section-intro">先理解实验条件，再引用结论。这里的“law”是经验规律，不是无条件成立的物理定律。</p>
+        <a class="reference-item" href="https://arxiv.org/abs/2001.08361" target="_blank" rel="noopener noreferrer"><span class="reference-number">[01]</span><div><h3>Scaling Laws for Neural Language Models</h3><p>Kaplan et al. · 2020 <span>幂律关系与早期计算最优结论</span></p></div><span aria-hidden="true">↗</span></a>
+        <a class="reference-item" href="https://arxiv.org/abs/2203.15556" target="_blank" rel="noopener noreferrer"><span class="reference-number">[02]</span><div><h3>Training Compute-Optimal Large Language Models</h3><p>Hoffmann et al. · 2022 <span>Chinchilla、IsoFLOP 与联合损失拟合</span></p></div><span aria-hidden="true">↗</span></a>
+        <a class="reference-item" href="https://arxiv.org/abs/2305.16264" target="_blank" rel="noopener noreferrer"><span class="reference-number">[03]</span><div><h3>Scaling Data-Constrained Language Models</h3><p>Muennighoff et al. · 2023 <span>数据受限时，重复训练的收益与边界</span></p></div><span aria-hidden="true">↗</span></a>
+        <a class="reference-item" href="https://arxiv.org/abs/2401.00448" target="_blank" rel="noopener noreferrer"><span class="reference-number">[04]</span><div><h3>Beyond Chinchilla-Optimal: Accounting for Inference in Language Model Scaling Laws</h3><p>Sardana et al. · 2024 <span>把推理需求纳入最优分配</span></p></div><span aria-hidden="true">↗</span></a>
+        <button class="next-page note-trigger" type="button" data-note="measurement"><span class="next-page-copy"><span class="eyebrow">继续深入 · SUPPLEMENT</span><span class="next-page-title">从一个最优点，到它背后的假设</span><span class="next-page-description">数学推导 / FLOPs 口径 / 数据边界 / 推理成本</span></span><span aria-hidden="true">→</span></button>
+      </section>
+      <footer class="page-footer"><span>LLM 学习笔记 <span class="footer-divider">/</span> Scaling Law</span><a href="#overview">返回顶部 ↑</a></footer>
+    </main>
+  </div>
+  <dialog class="notes-dialog" id="notes-dialog" aria-labelledby="notes-title">
+    <header class="notes-header">
+      <div><span class="eyebrow">SUPPLEMENT</span><h2 id="notes-title">补充说明</h2></div>
+      <button type="button" class="notes-close" aria-label="关闭补充说明" autofocus>×</button>
+    </header>
+    <div class="notes-toolbar">
+      <label for="notes-topic">阅读主题</label>
+      <select id="notes-topic">
+        <option value="measurement">A · 损失与评测口径</option>
+        <option value="compute">B · 6ND 从哪里来</option>
+        <option value="derivation">C · 计算最优解推导</option>
+        <option value="ratio">D · 20:1 的适用边界</option>
+        <option value="experiments">E · 如何拟合自己的规律</option>
+        <option value="deployment">F · 把推理成本算进去</option>
+        <option value="chinchilla-breakthrough">G · Chinchilla 的关键突破</option>
+      </select>
+    </div>
+    <div id="notes-content" class="notes-content supplement" tabindex="0" aria-label="补充说明正文">
+      <section id="note-measurement" class="content-section" data-note-panel="measurement" hidden>
+        <div class="section-heading"><span class="section-number">A</span><div><span class="eyebrow">WHAT ARE WE MEASURING?</span><h2>Loss 是预测误差，不是能力总分</h2></div></div>
+        <p>自回归语言模型在给定前缀时，为下一个 token 分配概率。常用的交叉熵损失，是正确 token 的负对数概率的平均值。</p>
+        <div class="formula-panel"><div class="formula" role="math" aria-label="L 等于负的 log p theta of x t given x less than t 的期望">L = −𝔼[log p<sub>θ</sub>(x<sub>t</sub> | x<sub>&lt;t</sub>)]</div><div class="formula-key"><span>自然对数：单位为 nats/token</span><span>以 2 为底：单位为 bits/token</span></div></div>
+        <p>使用自然对数时，困惑度 PPL = exp(L)。如果 loss 降低 Δ，困惑度乘以 exp(−Δ)，而不是简单减去 Δ。比如 L 从 3.0 降到 2.9，PPL 大约从 20.1 降到 18.2。</p>
+        <h3>比较之前，先确认四个条件</h3>
+        <ul><li><strong>相同分词口径：</strong>不同 tokenizer 的 token 粒度不同，nats/token 不宜直接横比；跨分词器比较可考虑统一字节口径，并说明数据预处理。</li><li><strong>相同评测分布：</strong>验证集、语料混合与上下文长度变化，都可能改变 loss 的基线。</li><li><strong>相同训练条件：</strong>学习率调度、优化器与数据质量影响拟合系数，不应被误归因于参数量。</li><li><strong>训练/验证分离：</strong>训练集上的低 loss 可能来自记忆或重复；必须检查验证 loss、去重与评测泄漏。</li></ul>
+        <div class="callout"><strong>关于 Chinchilla 的原始测量</strong><p>其规模实验使用平滑训练损失；论文在近似单遍、数据充足的实验设定下，将其视作测试损失的无偏估计。这不意味着在多轮重复训练中，训练损失总能替代验证损失。</p>
+          <p><strong>具体怎么平滑？</strong>附录 D.1 明确写道：<q lang="en">We use Gaussian smoothing with a window length of 10 steps to smooth the training curve.</q> 即<strong>高斯平滑，窗口长度为 10 个训练 step</strong>。</p>
+          <p>这是对记录下来的训练 loss 曲线做后处理，可理解为用邻近 step 的 loss 做高斯加权平均，以减小随机波动。方法 1 随后对曲线插值，提取各计算预算下的最低损失包络。它不是 label smoothing，也不修改反向传播使用的 loss。</p>
+          <p><strong>实现细节与适用范围：</strong>10 steps 是原文的窗口长度，不能直接当作标准差 σ = 10；该处未给出标准差、窗口是否居中或端点处理方式。这个具体设置写在方法 1 的附录 D.1；方法 2 也使用平滑后的最终 loss，但对应段落没有单独说明平滑参数，不宜断言所有分析都采用完全相同的实现。</p>
+          <a href="https://ar5iv.labs.arxiv.org/html/2203.15556#A4.SS1" target="_blank" rel="noopener noreferrer">原始依据：附录 D.1；处理流程见 §3.1，方法 2 见 §3.2 ↗</a>
+        </div>
+        <p>联合拟合中的 E 是针对指定分布、分词与上下文设定的渐近下限参数，可作“不可约损失”的模型化解释；它不是已经精确测得的、所有自然语言共享的熵常数。</p>
+      </section>
+      <section id="note-compute" class="content-section" data-note-panel="compute" hidden>
+        <div class="section-heading"><span class="section-number">B</span><div><span class="eyebrow">THE COMPUTE APPROXIMATION</span><h2>C ≈ 6ND 从哪里来？</h2></div></div>
+        <p>对以大规模矩阵乘法为主的稠密 Transformer，一个乘加常计为两次浮点运算。按每个 token 估计：</p>
+        <div class="table-wrap"><table><caption>训练主干矩阵运算的常用数量级近似</caption><thead><tr><th scope="col">阶段</th><th scope="col">每个 token 的计算量</th><th scope="col">直观解释</th></tr></thead><tbody><tr><td>前向传播</td><td>约 2N FLOPs</td><td>每个权重参与乘法与加法</td></tr><tr><td>反向传播</td><td>约 4N FLOPs</td><td>权重梯度与激活梯度，约两倍前向</td></tr><tr><td>合计 D 个 token</td><td>约 6ND FLOPs</td><td>每 token 运算量 × token 总数</td></tr></tbody></table></div>
+        <p>例如 7B 参数训练 140B tokens，近似计算量为 6 × 7 × 10<sup>9</sup> × 140 × 10<sup>9</sup> = 5.88 × 10<sup>21</sup> FLOPs。这只是运算总量，不是 GPU 数量或训练天数。</p>
+        <h3>FLOPs 不等于 FLOP/s，更不等于账单</h3>
+        <div class="formula-panel"><div class="formula" role="math" aria-label="训练时间约等于计算量除以设备数乘以单设备峰值吞吐乘以模型算力利用率">t ≈ <span class="frac"><span>C</span><span>n<sub>GPU</sub> · F<sub>peak</sub> · MFU</span></span></div><div class="formula-key"><span>C：FLOPs</span><span>F<sub>peak</sub>：每秒 FLOPs</span><span>MFU：模型算力利用率</span></div></div>
+        <p>如果 C 使用模型有用运算口径，应搭配同口径的 MFU，避免重复计算重算开销。通信、内存带宽、并行策略与故障恢复都会改变实际效率；该式只是粗估。</p>
+        <div class="callout"><strong>什么时候 6ND 不够用？</strong><p>长上下文注意力的二次项、词表投影、小模型中的 embedding 占比、激活重算、稀疏路由和硬件效率都需要单独检查。MoE 的计算更接近激活参数量相关的运算，但模型容量还涉及总参数、专家数和路由；不能仅替换一个 N，就复用稠密模型的 loss 系数。</p></div>
+        <p>参数口径也要一致：Kaplan 主要使用非 embedding 参数；Chinchilla 的详细 FLOPs 与参数统计包含 embedding。引用常数前应先核对论文定义。</p>
+        <a class="return-link" href="https://ar5iv.labs.arxiv.org/html/2203.15556#A6" target="_blank" rel="noopener noreferrer">原始依据：Chinchilla 附录 F 的运算量统计 ↗</a>
+      </section>
+      <section id="note-derivation" class="content-section" data-note-panel="derivation" hidden>
+        <div class="section-heading"><span class="section-number">C</span><div><span class="eyebrow">DERIVING THE OPTIMUM</span><h2>固定算力，求最优 N 与 D</h2></div></div>
+        <p>假设 A、B、α、β 均为正，使用联合经验模型 L̂(N,D) = E + AN<sup>−α</sup> + BD<sup>−β</sup>，并固定 C = 6ND。以下是这个假设模型的数学结论，而非独立于实验的普遍定理。</p>
+        <h3>第一步：把两个变量变成一个</h3>
+        <p>由约束得到 D = C/(6N)，代入：</p>
+        <div class="formula-panel"><div class="formula" role="math" aria-label="L of N 等于 E 加 A N 的负 alpha 次方，加 B 乘 6N 除以 C 的 beta 次方">L̂(N) = E + AN<sup>−α</sup> + B(6N/C)<sup>β</sup></div></div>
+        <p>随 N 增大，参数限制项下降，数据/训练不足项上升。对 log N 求导并令其为零：</p>
+        <div class="formula-panel"><div class="formula" role="math" aria-label="最优点满足 alpha A 除以 N 的 alpha 次方，等于 beta B 除以 D 的 beta 次方"><span class="frac"><span>αA</span><span>N<sup>α</sup></span></span> = <span class="frac"><span>βB</span><span>D<sup>β</sup></span></span></div><div class="formula-key"><span>平衡的是边际改善，而不是两项数值必须相等</span></div></div>
+        <p>令 u = log N，非恒定项是两个正系数指数函数之和，二阶导数严格为正；因此在无额外约束、N,D &gt; 0 的连续空间中，这个驻点是唯一的全局最小值。实际可选模型大小是离散的，还需做邻近配置比较。</p>
+        <h3>第二步：解出计算最优路径</h3>
+        <div class="formula-panel"><div class="formula" role="math" aria-label="N optimal 等于 G 乘 C 除以 6 的 a 次方；D optimal 等于 G 的负一次方乘 C 除以 6 的 b 次方">N<sub>opt</sub> = G(C/6)<sup>a</sup><br>D<sub>opt</sub> = G<sup>−1</sup>(C/6)<sup>b</sup></div><div class="formula-key"><span>a = β/(α + β)</span><span>b = α/(α + β)</span><span>G = (αA/βB)<sup>1/(α+β)</sup></span></div></div>
+        <p>因为 a + b = 1，所以两者的乘积与 C 成正比，符合预算约束。只有当 α ≈ β 时，才得到 N、D 大约都随 √C 增长。注意：参数规模指数取的是 β/(α+β)，并不是 α/(α+β)。</p>
+        <p>把最优解代回，还得到最优路径上的可约损失：L̂<sub>opt</sub> − E ∝ C<sup>−αβ/(α+β)</sup>。这里的“计算幂律”依赖于持续调整 N 与 D，不是固定一个模型只延长训练的曲线。</p>
+        <h3>主页面计算器究竟用了哪些值？</h3>
+        <div class="table-wrap"><table><caption>Chinchilla 论文附录 D.2 公布的舍入拟合参数</caption><thead><tr><th scope="col">E</th><th scope="col">A</th><th scope="col">B</th><th scope="col">α</th><th scope="col">β</th></tr></thead><tbody><tr><td>1.69</td><td>406.4</td><td>410.7</td><td>0.34</td><td>0.28</td></tr></tbody></table></div>
+        <p>N 与 D 必须使用原始数量：7B 应输入 7 × 10<sup>9</sup>，而不是 7。改变单位必须同时换算 A 与 B。主页面以 B/T 显示结果，但计算使用原始数量。</p>
+        <div class="callout"><strong>不要把两种精度、三种方法混在一起</strong><p>用上述舍入的 α = 0.34、β = 0.28，可得 a ≈ 0.452、b ≈ 0.548；论文表 2 对方法 3 报告的是约 0.46/0.54。主页面按公开舍入系数计算，不声称精确复现原始未舍入拟合，也不强行让该最优点满足 D/N = 20。方法 1、2 与方法 3 的预测本就不完全一致。</p></div>
+        <p>更大的预算常已超出用于拟合的小规模实验范围。漂亮、平滑的曲线不代表外推可靠；系数误差、曲率与数据分布变化都可能改变预测。</p>
+      </section>
+      <section id="note-ratio" class="content-section" data-note-panel="ratio" hidden>
+        <div class="section-heading"><span class="section-number">D</span><div><span class="eyebrow">A RULE OF THUMB, NOT A CONSTANT</span><h2>为什么 20:1 不是定律？</h2></div></div>
+        <p>Chinchilla 的实际配置为 70B 参数与 1.4T tokens，比例为 20。论文方法 1 的若干预测也接近这个量级，因此 D ≈ 20N 常被用作快速估算。</p>
+        <p>然而，“参数与数据大致同比例扩展”约束的是指数，并不能单独确定比例为 20。即使 α = β，固定比值也仍取决于 A、B；当 α ≠ β 时，D/N 还会随计算预算变化。</p>
+        <div class="formula-panel"><div class="formula" role="math" aria-label="最优数据与参数的比值正比于 C 的 alpha 减 beta 除以 alpha 加 beta 次方">D<sub>opt</sub>/N<sub>opt</sub> ∝ C<sup>(α−β)/(α+β)</sup></div></div>
+        <h3>如果只是做 20:1 的纸面估算</h3>
+        <p>明确假定 D = 20N，再结合 C ≈ 6ND，得到 N ≈ √(C/120)，D ≈ 20√(C/120)。它适合建立数量级直觉，不是主页面拟合函数的精确最优解。</p>
+        <div class="two-column"><article class="boundary-card"><h3>数据更多，不代表过拟合</h3><p>“超过训练计算最优 token 数”只说明目标偏离了那条预算最优路径。继续训练可能仍改善验证损失，不等于已经过拟合；是否过拟合应看训练/验证差异。</p></article><article class="boundary-card"><h3>更多 token，不总是更多信息</h3><p>D 是处理量。重复采样、低质量内容与全新高质量样本的收益不同。数据受限时应区分独特 token 数和重复轮数。</p></article></div>
+        <p>小规模 Chinchilla 拟合实验主要研究数据充足、近似单遍训练的区间。实际 1.4T 训练中，各语料子集的重复程度并不完全相同；不能据此认为原始联合模型已完整描述多轮重复的收益。</p>
+        <p><a href="https://arxiv.org/abs/2305.16264" target="_blank" rel="noopener noreferrer">Scaling Data-Constrained Language Models</a> 进一步研究了数据受限场景：适量重复可以有效，但反复增加轮数的收益会递减；不要把其特定实验中的重复轮数也当成普适阈值。</p>
+      </section>
+      <section id="note-experiments" class="content-section" data-note-panel="experiments" hidden>
+        <div class="section-heading"><span class="section-number">E</span><div><span class="eyebrow">BUILD YOUR OWN EVIDENCE</span><h2>如何拟合自己的 Scaling Law？</h2></div></div>
+        <p>最佳用法不是复制历史常数，而是在自己的语料、架构与训练设置上，用便宜实验约束昂贵决策。</p>
+        <ol class="note-steps"><li><strong>固定口径，记录所有变量</strong>锁定 tokenizer、验证集、上下文长度和数据配比。每个实验记录 N、已处理 D、实际 FLOPs、训练与验证 loss、学习率调度、随机种子和吞吐。</li><li><strong>设计 N × D 网格，而非只增大 N</strong>在多个预算上训练多种模型大小，让每条 IsoFLOP 曲线覆盖最优点两侧。只有一侧的单调趋势，很难可靠定位谷底。</li><li><strong>让学习率周期与训练长度匹配</strong>把一次很长训练的中途 checkpoint，直接当作该较短训练预算的最优终点，会造成偏差。Chinchilla 对学习率周期的重新设计，是其与早期估计不同的重要因素之一。</li><li><strong>拟合正系数，检查残差与不确定性</strong>可以用对数参数化保证 A、B、E、α、β 为正，并采用稳健损失减弱异常点影响。原论文使用预测与观察的 log loss 差值的 Huber 损失；不要把“在 log 空间拟合”误解为简单地给联合公式做线性回归。</li><li><strong>做真正的留出验证</strong>将部分更大规模或不同预算的完整实验作为留出集，而不只是随机留出同一次训练的邻近 checkpoint。使用多个种子或 bootstrap 估计不确定性，检查外推是否系统偏离。</li><li><strong>围绕候选配置验证真实训练</strong>先用中等规模实验检验预测，再选取受数据与硬件约束的配置。不要因为模型给出小数点后三位，就认为最优参数量具有同等精度。</li></ol>
+        <div class="callout"><strong>Kaplan 与 Chinchilla，不是“旧公式完全错了”</strong><p>两者都支持规模的经验可预测性，且都不要求把每个模型训练到完全收敛。差异涉及训练长度与调度、模型尺度、拟合方法和参数口径。应比较实验设计，而不是只背 0.73 与 0.50。</p></div>
+        <a class="return-link" href="https://arxiv.org/abs/2203.15556" target="_blank" rel="noopener noreferrer">参阅 Chinchilla §2、§3、附录 B / D / E ↗</a>
+      </section>
+      <section id="note-deployment" class="content-section" data-note-panel="deployment" hidden>
+        <div class="section-heading"><span class="section-number">F</span><div><span class="eyebrow">THINK BEYOND PRETRAINING</span><h2>训练最优，不等于部署最优</h2></div></div>
+        <p>经典计算最优问题是：固定训练 FLOPs，最小化预训练 loss。如果模型要服务大量请求，较小模型每次推理更便宜，那么先花更多训练计算“多读一些数据”，可能降低整个使用周期的成本。</p>
+        <div class="formula-panel"><div class="formula" role="math" aria-label="生命周期计算量约等于 6ND 加 2NQ">C<sub>lifecycle</sub> ≈ 6ND + 2NQ</div><div class="formula-key"><span>D：训练 tokens</span><span>Q：简化模型中累计推理处理的 token 数</span></div></div>
+        <p>在这个非常简化的稠密模型算式里，2NQ 对应推理前向的主要矩阵运算。当 Q 很大时，减小 N 带来的重复节省，可能超过增加 D 的一次性训练成本。</p>
+        <h3>优化问题也随之改变</h3>
+        <p>可以把问题改为：给定目标质量 L<sub>target</sub> 与推理需求 Q，在满足 L̂(N,D) ≤ L<sub>target</sub> 的前提下，最小化 6ND + 2NQ；或固定生命周期预算来优化质量。最优训练比例便不再必然是 D ≈ 20N。</p>
+        <div class="callout"><strong>这个式子不等于线上成本模型</strong><p>真实系统还受 prompt 长度、prefill/decode 差异、KV cache、batch 大小、延迟目标、内存带宽、量化和并行通信影响。输入与输出 token 的实际成本并不相同。2NQ 只是解释方向的近似，不能直接作为定价或采购依据。</p></div>
+        <p>因此，一个小模型训练了“远超 20N”的 tokens，不自动反驳 Chinchilla；可能只是目标从训练计算最优，变成了数据受限、模型大小受限或推理成本最优。判断方案之前，先问清楚优化目标。</p>
+        <p><a href="https://arxiv.org/abs/2401.00448" target="_blank" rel="noopener noreferrer">Beyond Chinchilla-Optimal: Accounting for Inference in Language Model Scaling Laws</a>（Sardana et al., ICML 2024）系统讨论了将推理需求纳入资源分配的问题。</p>
+      </section>
+      <section id="note-chinchilla-breakthrough" class="content-section" data-note-panel="chinchilla-breakthrough" hidden>
+        <div class="section-heading"><span class="section-number">G</span><div><span class="eyebrow">WHY CHINCHILLA MATTERS</span><h2>突破不在“首次发现”，而在修正与验证</h2></div></div>
+        <p>用本章的两个层次理解：Chinchilla 更系统地测量资源与 loss 的关系，从而改变最优预算分配的建议，再把预测落实为一次大规模训练。它的核心贡献是<strong>实验方法、资源配比与实际验证</strong>，而不是一种全新的模型架构。</p>
+        <h3>1. 相比前作：预算最优问题早已存在</h3>
+        <p><a href="https://arxiv.org/abs/2001.08361" target="_blank" rel="noopener noreferrer">Kaplan et al.（2020）</a> 已研究规模幂律、样本效率与固定预算下的最优配置。其建议更偏向扩大模型、用相对较少的数据，并在充分收敛前停止训练。</p>
+        <p>Chinchilla 同样不要求把每个模型训练到充分收敛。修正的是<strong>模型该多大，以及应该训练多少 token 再停止</strong>，不是从“提前停止”改成“必须收敛”。</p>
+        <div class="table-wrap"><table><caption>训练预算增加 10 倍时，最优资源规模如何扩展</caption><thead><tr><th scope="col">工作</th><th scope="col">参数量 N</th><th scope="col">训练 tokens D</th></tr></thead><tbody><tr><td>Kaplan 2020</td><td>约 ×5.4</td><td>约 ×1.9</td></tr><tr><td>Chinchilla 2022（概括）</td><td>约 ×3.2</td><td>约 ×3.2</td></tr></tbody></table></div>
+        <p>“大致同步扩展”说的是增长指数接近，不是各分一半 FLOPs；训练计算量近似为两者的乘积 6ND。当时不少模型扩大参数量，却仍只训练约 300B tokens。Chinchilla 指出：相对于已有预算，它们往往模型偏大、训练量偏少。</p>
+        <h3>2. 为什么结论变了：实验设计更贴合问题</h3>
+        <p>论文进行了超过 400 次模型训练，覆盖约 70M 到超过 16B 参数及多种训练长度，不只比较模型大小，还系统改变处理的 token 数。</p>
+        <div class="callout"><strong>关键细节：学习率调度应匹配目标训练长度</strong><p>举例说，专门为 100B tokens 设计并完成学习率衰减的训练，不等于计划训练 1T tokens、只取其中 100B 时的 checkpoint。后者尚未完成适合短预算的学习率衰减，可能高估该预算下能达到的最低 loss。</p><p>Chinchilla 对这一问题做了实验并校准调度。但调度不是差异的唯一原因：模型规模范围、拟合方法以及最优曲线的弯曲程度也有影响。</p></div>
+        <p>它用三种方法交叉检验结论：</p>
+        <ol><li><strong>训练曲线包络：</strong>在多个模型与训练长度中，找每笔计算预算对应的最低 loss。</li><li><strong>IsoFLOP 曲线：</strong>固定总 FLOPs，改变模型大小与 token 数，直接寻找损失谷底。</li><li><strong>联合损失拟合：</strong>拟合 L̂(N,D) = E + A/N<sup>α</sup> + B/D<sup>β</sup>，再在预算约束下求最优解。</li></ol>
+        <p>三种方法都支持更平衡的扩展，但具体指数与最优模型大小并不完全相同。这是相互支持的经验结果，而非精确的普适定律。</p>
+        <h3>3. 为什么有说服力：按预测训练，确实更强</h3>
+        <div class="table-wrap"><table><caption>大规模对照：论文报告相当的训练计算预算</caption><thead><tr><th scope="col">模型</th><th scope="col">参数量</th><th scope="col">训练 tokens</th></tr></thead><tbody><tr><td>Gopher</td><td>280B</td><td>300B</td></tr><tr><td>Chinchilla</td><td>70B</td><td>1.4T</td></tr></tbody></table></div>
+        <p>Chinchilla 只有 Gopher 四分之一的参数，却在大量下游评测中取得更好结果，同时降低模型存储需求与推理计算成本。贡献不只是“拟合曲线更合理”，而是<strong>用小规模实验指导昂贵训练，并验证了调整配比的价值</strong>。预算比较应遵循论文的 FLOPs 统计口径，不应要求表中舍入数值的 6ND 乘积严格相等。</p>
+        <div class="callout"><strong>这不是只改变 N、D 的完全纯净对照</strong><p>两者还有优化器（Adam / AdamW）、tokenizer、数据采样比例及权重存储精度等差异。因此不能把全部提升都归因于资源配比，也不能据此声称已验证所有尺度上的精确最优点。</p></div>
+        <h3>4. 应该记住什么，不该推导出什么？</h3>
+        <p>重点从“参数有多大”转向<strong>给定计算预算，怎样得到更好的模型</strong>。模型规模与数据规模需要一起考虑，高质量数据的收集与使用因此更重要。</p>
+        <ul><li>不意味着小模型总比大模型强：结论依赖预算与训练条件。</li><li>不意味着 20 tokens / parameter 是精确常数、数据上限或收敛标准。</li><li>不意味着历史系数能保证任意新模型的最低 loss；外推与部署成本仍需单独验证。</li></ul>
+        <p><strong>历史定位：</strong>Kaplan 系统展示了规模可预测、预算可优化的框架；Chinchilla 对模型—数据权衡作出影响重大的实证修正，并给出大规模验证。</p>
+        <p>原始依据：<a href="https://arxiv.org/abs/2203.15556" target="_blank" rel="noopener noreferrer">Training Compute-Optimal Large Language Models</a>，§2（与前作的区别）、§3（三种估计方法）、§4（Gopher 对照）、附录 B（调度）与 G（其他训练差异）。</p>
+      </section>
+    </div>
+    <p class="notes-hint">Esc 关闭 · 返回当前阅读位置</p>
+  </dialog>
+</body>
+</html>

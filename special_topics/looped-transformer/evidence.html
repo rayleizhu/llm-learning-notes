@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Looped Transformer 研究阅读路线与证据边界：如何判断 OpenAI 架构传闻，怎样解读 Huginn 实验，以及与 Coconut 的差别。">
+  <meta name="color-scheme" content="light dark">
+  <title>论文与证据边界 · Looped Transformer</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="script.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到正文</a>
+  <aside class="sidebar">
+    <a class="brand" href="index.html"><span>Looped Transformer</span> 解读</a>
+    <div class="sub">补充 B · 原始实验与证据边界</div>
+    <nav class="toc" aria-label="研究补充目录">
+      <a href="#rumor" class="active"><span>B1</span> 架构传闻与来源</a>
+      <a href="#results"><span>B2</span> Huginn 原始结果</a>
+      <a href="#matched-data" class="l2">同数据量：p × 2 vs 2p</a>
+      <a href="#smelt" class="l2">SMELT：三项预算配平</a>
+      <a href="#papers"><span>B3</span> 一手阅读路线</a>
+      <a href="#coconut"><span>B4</span> Coconut 的区别</a>
+      <a href="#topology" class="l2">拓扑限制与动态状态跟踪</a>
+      <a href="#distillation"><span>B5</span> 蒸馏假说如何验证</a>
+      <a href="#checklist"><span>B6</span> 实验检查清单</a>
+    </nav>
+    <div class="sidebar-bottom">
+      <a class="sidebar-extra" href="index.html">← 返回专题主页面</a>
+      <a class="sidebar-extra" href="mechanics.html">补充 A · 原理与工程细节 ↗</a>
+      <button class="theme-toggle" type="button" aria-pressed="true">切换浅色模式</button>
+      <div class="reading-progress" aria-hidden="true"><span></span></div>
+      <p class="tiny muted">公开研究成立，不等于产品归因成立。</p>
+    </div>
+  </aside>
+  <div class="page">
+    <header class="topbar"><span>EVIDENCE & PAPERS <span class="slash">/</span> SUPPLEMENT B</span><a href="index.html">← 专题主页面</a></header>
+    <main id="main" class="prose">
+      <header class="article-hero"><div class="eyebrow"><span class="status-dot"></span> 补充 B / 阅读与求证</div><h1>研究有依据，<br><span>归因要克制。</span></h1><p class="lead">“循环深度是一条值得研究的路线”与“某个闭源模型采用它”是两个独立命题。前者可以读论文、看代码；后者需要针对该模型的直接证据。</p><div class="article-meta"><span>资料核对：2026-11-11</span><span>范围：所列公开论文、代码与本次检索</span></div></header>
+
+      <section id="rumor" class="section">
+        <div class="section-heading"><span class="section-number">B1 / CLAIMS & EVIDENCE</span><h2>关于 OpenAI 的传闻，能说到哪一步？</h2></div>
+        <aside class="notice"><span class="notice-tag">本专题的结论</span><p>本次检索看到了关于 OpenAI 前沿模型使用 recurrent depth / looped transformer 的媒体转述，但<strong>未取得足以核验该架构归属的一手技术披露</strong>。这表示证据不足，不等于证明其没有采用。本文不为任何具体闭源模型补写参数量、循环次数或缓存实现。</p></aside>
+        <div class="source-links"><span class="source-title">2026 年 9 月讨论的可追溯来源</span><ul><li><a href="https://www.theinformation.com/articles/secret-technique-behind-openais-astra-model-sparks-security-concerns" target="_blank" rel="noopener noreferrer">The Information：Secret Technique Behind OpenAI’s Astra Model Sparks Security Concerns</a>。本次请求返回 403，未读取全文；“采用 recurrent depth 并影响推理可见性”的说法按下列评论转述记录，不视为独立核验。</li><li><a href="https://sebastianraschka.com/blog/2026/openai-astra-looped-transformers.html" target="_blank" rel="noopener noreferrer">Raschka，2026-09-02：OpenAI Astra and Looped Transformers</a>。技术评论，解释层复用不必抑制可见 CoT；不是 OpenAI 的架构披露。</li><li><a href="https://magazine.sebastianraschka.com/p/gpt-6-astra-looped-transformers-and" target="_blank" rel="noopener noreferrer">Raschka，2026-09-09：GPT-6 Astra, Looped Transformers, and Hidden Reasoning</a>。转引 Jakub Pachocki 关于当前模型计算图深度与 GPT-4 接近（约两倍以内）、可监控性趋势不依赖架构变化的回应。本次未独立取得原帖，因此仅作为转引记录。</li></ul></div>
+        <p>计算图深度接近既不能确认，也不能排除参数共享；“存在监控退步”与“由 looping 导致”又是不同命题。这里不裁定某模型的未公开实现，也不推断其商业动机。</p>
+        <p>多个转述若都来自同一条消息，不能算成多个独立证据。搜索摘要和产品名称也不能替代技术披露。合作公告只能支持算力合作，不能确认 looped 架构：<a href="https://openai.com/index/cerebras-partnership/" target="_blank" rel="noopener noreferrer">OpenAI / Cerebras 公告</a>本次仅取得官方搜索摘要，正文返回 403。</p>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="不同证据的证明能力"><table><caption>哪些材料能支持“某模型采用某架构”</caption><thead><tr><th scope="col">材料</th><th scope="col">能支持什么</th><th scope="col">不能直接推出什么</th></tr></thead><tbody><tr><th scope="row">官方技术报告 / 代码</th><td>在明确的模型与版本范围内，支持其披露的结构。</td><td>未披露的训练配方、实现细节、其他版本也完全相同。</td></tr><tr><th scope="row">公开研究论文</th><td>证明作者研究了某种方法，并报告相应结果。</td><td>同领域的某家公司的产品已经采用它。</td></tr><tr><th scope="row">媒体报道 / 二手转述</th><td>作为待核验线索，需追溯原始出处与上下文。</td><td>完整且已确认的架构事实。</td></tr><tr><th scope="row">输出与速度变化</th><td>观察到产品行为、性能或延迟变化。</td><td>变化唯一来自 looped transformer。</td></tr></tbody></table></div>
+        <h3>“思考更久、答案更短”为什么不够？</h3>
+        <p>内部文本推理、工具调用、搜索、采样策略、服务端调度、结果筛选以及界面摘要，都可能改变可见文本和延迟。多个不同系统可以产生相似外部表现，因此仅靠黑盒交互无法唯一识别内部架构。</p>
+        <p>同样，潜在状态不可直接阅读不意味着“没有推理”，但也不能凭“内部有连续向量”就认定发生了某种具体推理算法。自然语言解释与内部计算的忠实对应关系，本来就需要单独研究。</p>
+        <div class="inline-insight"><span>更新原则</span><p>如果未来出现正式披露，应记录原始链接、模型版本、发表日期和原文范围，再更新归因；不要把未经确认的猜测反写成早已确定的事实。</p></div>
+      </section>
+
+      <section id="results" class="section">
+        <div class="section-heading"><span class="section-number">B2 / READING RESULTS</span><h2>Huginn 证明了什么，没有证明什么？</h2></div>
+        <p>Geiping 等人的论文展示了一个 3.5B 参数的循环深度语言模型。公开数据、训练代码与模型，让这条路线不只停留在示意图上。以下数字固定引用 <strong>arXiv v2，2025-02-17</strong>，避免混用版本或不同 checkpoint。</p>
+        <div class="two-col"><article class="card"><span class="evidence-label">原文支持</span><h3>一条可行的研究路线</h3><p>在该模型与所测任务中，增加循环次数可以改善推理表现；不同任务的收益与饱和点不同。论文还探索了自适应退出、缓存共享和状态热启动。</p></article><article class="card"><span class="evidence-label">不能外推</span><h3>不是闭源前沿模型的拆解</h3><p>不证明 OpenAI 使用相同实现，不证明循环必胜同计算预算模型，也不证明增加 R 能一直改善表现或无损替代知识容量。</p></article></div>
+        <h3>一个可复核的切片：同一模型，不同循环深度</h3>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="Huginn 论文原始实验数字"><table><caption>Recurrent Depth v2 · 表 1 · zero-shot，指标沿用原表（适用时使用 normalized accuracy）</caption><thead><tr><th scope="col">循环次数 R</th><th scope="col">参数量</th><th scope="col">ARC-C（%）</th><th scope="col">MMLU（%）</th><th scope="col">SciQ（%）</th></tr></thead><tbody><tr><th scope="row">4</th><td>3.5B</td><td>27.99</td><td>23.39</td><td>88.50</td></tr><tr><th scope="row">8</th><td>3.5B</td><td>35.15</td><td>25.29</td><td>92.10</td></tr><tr><th scope="row">16</th><td>3.5B</td><td>37.71</td><td>31.25</td><td>93.90</td></tr><tr><th scope="row">32</th><td>3.5B</td><td>38.23</td><td>31.38</td><td>93.50</td></tr></tbody></table></div>
+        <p class="figure-note">来源：<a href="https://arxiv.org/html/2502.05171v2#S5.T1" target="_blank" rel="noopener noreferrer">论文表 1 原始数字 ↗</a>。这里是摘录，不是本站复现实测。MMLU 的增益明显放缓，SciQ 在 32 轮时略低于 16 轮；没有误差区间时，不应把小幅变化夸大为确定趋势。</p>
+        <h3>三个很容易混淆的数字</h3>
+        <ul><li><strong>3.5B：</strong>独立参数量，不随推理循环次数复制。</li><li><strong>约 800B tokens：</strong>预训练数据处理量；论文训练日志写实际完成 795B，概述取约数。</li><li><strong>“50B-equivalent compute”：</strong>指测试时计算负载的量级类比，不是 50B 个独立参数，也不是质量达到了所有 50B 模型的水平。</li></ul>
+        <p>论文还明确讨论了数据混合、学习率未冷却、训练规模等限制。与其他模型比较时，参数量、数据量和计算量并非同时匹配。某个 3.5B 循环模型优于较老基线，不足以证明在当代等训练预算、等延迟的比较下必然更优。</p>
+        <p class="source-note">建议连读：<a href="https://arxiv.org/html/2502.05171v2#S5" target="_blank" rel="noopener noreferrer">§5 基准结果与局限</a>、<a href="https://arxiv.org/html/2502.05171v2#S6" target="_blank" rel="noopener noreferrer">§6 探索性推理策略</a>，不要只看摘要中的最大数字。</p>
+      </section>
+
+      <section id="matched-data" class="section">
+        <div class="section-heading"><span class="section-number">B2.1 / MATCHED DATA</span><h2>p 循环两次 vs 独立 2p：应该怎样读？</h2></div>
+        <p>依据 <a href="https://arxiv.org/html/2502.17416v1" target="_blank" rel="noopener noreferrer">Reasoning with Latent Thoughts v1，§3.1、表 3、附录 A.2</a>：12 层循环两次与独立 24 层使用同一批 250B Pile tokens，顺序一致。宽度等其他超参数保持一致，论文以主干层预算比较 FLOPs。精确总参数量不等于严格的 p / 2p，因为含词嵌入等固定开销。</p>
+        <p><a href="index.html#comparison">主页面的原表摘录</a>中，循环模型的数学任务均分 34.3 高于 29.3，但困惑度 7.90 差于 7.40，闭卷 QA 为 9.3 对 11.2。<strong>结论是任务依赖的归纳偏置，而非普遍更好的语言建模。</strong></p>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="同数据实验的解读限制"><table><thead><tr><th scope="col">容易误读之处</th><th scope="col">原始口径与限制</th></tr></thead><tbody><tr><th scope="row">“推理任务全部更好”</th><td>数学 MultiArith：循环 2.0，独立深模型 2.7。推理基础任务中的 Code depth-1 为 21.3 对 24.2；组均值优势主要来自 depth-0 查询。见附录表 7–8。</td></tr><tr><th scope="row">“总均分代表所有实验”</th><td>表 3 的 All Tasks 只含闭卷、开卷与数学共 15 项，不包含另外 4 项推理基础任务。</td></tr><tr><th scope="row">“7.90 是交叉熵 loss”</th><td>这是 perplexity，不是 loss。二者相关但不能直接混用数值。</td></tr><tr><th scope="row">“p 是精确的某个 B 数”</th><td>正文与附录对 24 层基线的规模称呼存在 1B / 1.5B 差异。本专题采用可核查的 12 / 24 层结构，不自行推算精确总参数。</td></tr><tr><th scope="row">“证明测试时临时加循环就变强”</th><td>这些配置分别训练，不是对同一 checkpoint 随意增加 R 的实验。Huginn 的可变深度测试回答的是另一个问题。</td></tr><tr><th scope="row">“均分更高已统计显著”</th><td>主表未报告多种子均值与置信区间，也没有证明在前沿尺度、等部署时延下普遍成立。</td></tr></tbody></table></div>
+        <p>独立网络可以用相等权重表示共享网络，故此实验不是“共享扩大了函数类”。更合理的解释是共享约束影响有限数据下的泛化与优化；它同时降低知识存储和各层专门化的自由度。</p>
+      </section>
+
+      <section id="smelt" class="section">
+        <div class="section-heading"><span class="section-number">B2.2 / THREE MATCHED BUDGETS</span><h2>SMELT：不把额外计算误认成架构收益</h2></div>
+        <p>依据 <a href="https://arxiv.org/html/2609.01343v3" target="_blank" rel="noopener noreferrer">SMELT v3（2026-09-11），§3–4</a>。中间一半层执行两遍，有效深度约为 1.5 倍；循环区残差更新缩放为 1/2。它不是只改变一个 loop 开关，而是联合调节宽度、专家数和注意力配置。</p>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="SMELT预算配平"><table><thead><tr><th scope="col">匹配预算</th><th scope="col">如何补偿循环开销</th><th scope="col">论文报告的典型差异</th></tr></thead><tbody><tr><th scope="row">每 token 训练 FLOPs</th><td>主要缩小隐藏维度；计入 attention 成本，而非只用 6N 近似。</td><td>&lt; 4%</td></tr><tr><th scope="row">总非嵌入参数</th><td>增大专家总数，保持 top-8 路由，恢复存储容量。</td><td>&lt; 1%</td></tr><tr><th scope="row">KV Cache</th><td>调小 head 维度、提高 GQA 比率；第二遍仍重新计算 Q/K/V。</td><td>&lt; 4%</td></tr></tbody></table></div>
+        <p>配对模型使用相同 token 序列。训练上下文为 4096，采用文档段级 mask；最长路径约 215B tokens。四种规模中最大 54B 非嵌入参数；规模标签 100M / 200M / 600M / 1.6B 指基线活跃非嵌入参数，不是所有存储参数。</p>
+        <p>例如标为 200M 的约 95% FLOPs 等效稀疏配置：基线 12 个执行层、隐藏维度 1280、192 专家；SMELT 18 个执行层、维度 1056、288 专家。总非嵌入参数为 3.87B / 3.89B，每 token 训练 FLOPs 为 1.33×10⁹ / 1.37×10⁹。可见它是近似而非逐项完全相等的控制。</p>
+        <h3>6.8%–18.0% 到底是什么？</h3>
+        <p>作者分别拟合两种架构的 Chinchilla 式标度律，再在固定总计算 C = F × D 下优化每 token FLOPs F 与训练 token 数 D，比较达到相同验证损失所需的计算。这与前面的“配对实验相同 token”不矛盾：<strong>拟合最优点允许两种架构各自选择 F、D。</strong></p>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="SMELT拟合计算收益"><table><caption>原论文 §4 的部分点估计；括号为 95% cell-bootstrap 区间</caption><thead><tr><th scope="col">SMELT 计算预算</th><th scope="col">FLOPs 等效稀疏度</th><th scope="col">同损失训练计算节省</th></tr></thead><tbody><tr><td>10²⁰ FLOPs</td><td>约 97%</td><td>6.8% [4%, 14%]</td></tr><tr><td>10²¹ FLOPs</td><td>约 85%</td><td>18.0% [8%, 28%]</td></tr></tbody></table></div>
+        <p>6.8%–18.0% 是文中六个前沿拟合点的估计范围，不是每个模型都实测该幅度。每配置只训练一次，bootstrap 不充分覆盖训练种子方差；语料为内部数据。10²² FLOPs 下更大的收益属于外推，不应混入已测试结论。</p>
+        <div class="callout warn"><b class="t">没有回答完的问题</b>训练算术 FLOPs 节省不等于 GPU 小时、服务成本或延迟按比例下降。结果限于该 MoE 族、配方与稀疏区间，也不能单独识别层复用、宽度调整和专家配置各自的全部贡献。</div>
+      </section>
+
+      <section id="papers" class="section">
+        <div class="section-heading"><span class="section-number">B3 / PRIMARY SOURCES</span><h2>一手材料，按问题来读。</h2><p>以下是精选路线，不是该领域的完整文献综述。</p></div>
+        <div class="paper-list">
+          <article class="paper"><div class="paper-meta">01 / 起点 · 2018 预印本，ICLR 2019</div><h3><a href="https://arxiv.org/abs/1807.03819" target="_blank" rel="noopener noreferrer">Universal Transformers ↗</a></h3><p>Dehghani et al. 把深度递归、自注意力与逐位置自适应计算结合起来。带着“深度循环与时间循环如何不同”这个问题读；不要把文中的特定理论条件推广到所有实际模型。</p></article>
+          <article class="paper"><div class="paper-meta">02 / 参数共享 · 2019 预印本</div><h3><a href="https://arxiv.org/abs/1909.11942" target="_blank" rel="noopener noreferrer">ALBERT: A Lite BERT for Self-supervised Learning of Language Representations ↗</a></h3><p>Lan et al. 研究跨层参数共享等参数效率方法。适合理解“共享权重为什么省参数”，但它不是测试时无限加深可持续获益的证据。</p></article>
+          <article class="paper"><div class="paper-meta">03 / 推理与深度 · ICLR 2025，arXiv:2502.17416</div><h3><a href="https://arxiv.org/abs/2502.17416" target="_blank" rel="noopener noreferrer">Reasoning with Latent Thoughts: On the Power of Looped Transformers ↗</a></h3><p>Saunshi et al. 从合成推理任务、语言模型实验与理论分析研究循环深度。核心启发是部分推理任务需要多步计算，但不一定需要每步独立参数。</p><p><strong>边界：</strong>理论上的 CoT 模拟能力是特定假设下的可表示性结果，不等于任意训练方法都能自动学会同样算法，更不表示计算成本消失。</p></article>
+          <article class="paper"><div class="paper-meta">04 / 规模化实例 · 2025，本文技术细节采用 v2</div><h3><a href="https://arxiv.org/abs/2502.05171" target="_blank" rel="noopener noreferrer">Scaling up Test-Time Compute with Latent Reasoning: A Recurrent Depth Approach ↗</a></h3><p>Geiping et al. 介绍 Huginn 的三段式架构、随机深度预训练、截断反传和多种推理策略。先读 §3，再读 §4.3 的失败训练，最后读 §5–7 的结果与行为分析。</p><div class="resource-links"><a href="https://arxiv.org/html/2502.05171v2" target="_blank" rel="noopener noreferrer">固定版本全文 ↗</a><a href="https://github.com/seal-rg/recurrent-pretraining" target="_blank" rel="noopener noreferrer">作者代码 ↗</a><a href="https://huggingface.co/tomg-group-umd/huginn-0125" target="_blank" rel="noopener noreferrer">模型页 ↗</a></div></article>
+          <article class="paper"><div class="paper-meta">05 / 对照阅读 · 2024 预印本，COLM 2025</div><h3><a href="https://arxiv.org/abs/2412.06769" target="_blank" rel="noopener noreferrer">Training Large Language Models to Reason in a Continuous Latent Space ↗</a></h3><p>Hao et al. 提出 Coconut：不先解码成词语，而是将隐藏状态反馈为下一步输入嵌入。用于理解“潜在推理”这个大类为何包含不同实现。</p></article>
+          <article class="paper"><div class="paper-meta">06 / 动态计算 · 2025，v3</div><h3><a href="https://arxiv.org/abs/2507.10524v3" target="_blank" rel="noopener noreferrer">Mixture-of-Recursions: Learning Dynamic Recursive Depths for Adaptive Token-Level Computation</a></h3><p>Bae et al. 将参数共享与 token 级深度路由结合，每轮只缓存活跃 token 的 KV，并研究复用首轮 KV 的变体。关键问题是动态计算能否转化成系统收益；等训练 FLOPs 不自动保证等训练 token 或等延迟。</p></article>
+          <article class="paper"><div class="paper-meta">07 / 大规模循环预训练 · 2025，数字固定引用 v2</div><h3><a href="https://arxiv.org/abs/2510.25741v2" target="_blank" rel="noopener noreferrer">Scaling Latent Reasoning via Looped Language Models</a></h3><p>Zhu et al. 提出 Ouro / LoopLM：潜在迭代与熵正则化深度分配，预训练规模扩至 7.7T tokens；报告 1.4B / 2.6B 系列与更大模型的基准比较。摘要未充分给出所有比较预算，不能把“匹配最高 12B 模型的部分表现”改写成等算力全面胜出。此处使用 2025-11-03 的 v2，不声称覆盖后续所有版本。</p></article>
+          <article class="paper"><div class="paper-meta">08 / 计算、参数、缓存配平 · 2026，v3</div><h3><a href="https://arxiv.org/html/2609.01343v3" target="_blank" rel="noopener noreferrer">SMELT: Scaling Laws for Compute-Matched MoE Looped Transformers</a></h3><p>Wang et al. 通过缩窄模型、增加专家数、调整 GQA，研究循环在近似相同三项预算下的收益。先读 §3 的配平口径，再读 §4 的拟合与不确定性；<a href="#smelt">本页摘要</a>保留了与实际耗时、前沿外推的区别。</p></article>
+          <article class="paper"><div class="paper-meta">09 / 动态状态与架构边界 · 2026，本文采用 v2</div><h3><a class="note" href="#topology">The Topological Trouble With Transformers</a></h3><p>Mozer、Siddiqui、Liu（Google DeepMind）从状态更新的串行依赖出发，分析固定深度前馈结构的限制，并区分深度循环与跨时间反馈。它补充了循环的结构性动机，也指出有限 depth loops 不自动解决持续状态跟踪；完整解读见 B4.1，含原文链接与适用边界。</p></article>
+        </div>
+      </section>
+
+      <section id="coconut" class="section">
+        <div class="section-heading"><span class="section-number">B4 / COCONUT</span><h2>都在潜在空间思考，循环位置不同。</h2></div>
+        <p>Coconut 将语言模型的末层隐藏状态直接作为下一连续思维位置的输入嵌入，避免先将该状态投影、采样成一个文字 token。模型继续运行，直到切回语言模式输出文本。</p>
+        <div class="two-col"><article class="card"><span class="card-kicker">HUGINN 式深度循环</span><h3>在核心块内增加步骤</h3><p>重复调用模型中间的一组共享层，处理相同序列位置上的状态。增加深度轮次本身不增加序列位置。</p></article><article class="card"><span class="card-kicker">COCONUT 式连续思维</span><h3>用隐藏状态接续推理位置</h3><p>把整个语言模型的输出状态反馈为下一个输入嵌入。普通模型内部不同层可以仍有独立权重，连续思维位置也会带来缓存开销。</p></article></div>
+        <p>因此二者有家族相似性，却不应混用具体公式、训练配方和成本结论。尤其不能把“没有额外的可读文字”直接等同于“没有额外序列位置或 KV Cache”。原则上，连续思维的反馈方式也能与内部共享循环块组合。</p>
+        <p class="source-note">依据：<a href="https://arxiv.org/abs/2412.06769" target="_blank" rel="noopener noreferrer">Coconut 论文</a>；关于两类路线联系，亦见 <a href="https://arxiv.org/html/2502.05171v2#S6.SS3" target="_blank" rel="noopener noreferrer">Recurrent Depth §6.3</a>。本文是结构层面的比较，不声称有直接的公平性能对照。</p>
+      </section>
+
+      <section id="topology" class="section">
+        <div class="section-heading"><span class="section-number">B4.1 / STATE TRACKING & TOPOLOGY</span><h2>前馈结构的拓扑限制：为什么“再算几轮”还不够？</h2></div>
+        <p><strong>The Topological Trouble With Transformers</strong>，Michael C. Mozer、Shoaib Ahmed Siddiqui、Rosanne Liu，Google DeepMind。首次提交于 2026-04-18；以下解读固定依据 <a href="https://arxiv.org/html/2604.17121v2" target="_blank" rel="noopener noreferrer">v2（2026-04-28）</a>，不声称覆盖后续所有修订。这是一篇围绕架构限制的概念分析与文献综合，不是新的循环模型基准成绩报告。</p>
+        <h3>1. 保存历史，不等于持续维护状态</h3>
+        <div class="equation-card"><div class="equation">s<sub>t</sub> = f(s<sub>t−1</sub>, x<sub>t</sub>)</div><p>t 是输入时间步；s 是读入新信息后更新的状态，不是历史 token 的简单集合。比如对话中实体的当前关系，需要依据新事件继续更新，而不只是找回某句话。</p></div>
+        <p>论文 §2 指出，标准因果 Transformer 的信息沿层级向上流动。若上一个位置的状态在深层形成，后续位置的浅层不能直接读取它；要依赖它继续更新，就需要沿更深的路径计算。对于无法由更浅算法替代的串行更新链，固定有效深度成为限制。问题既包括<strong>深度最终耗尽</strong>，也包括状态形成得太晚，无法及时参与浅层处理。</p>
+        <h3>2. 深度循环与时间循环，解决的问题不同</h3>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="深度循环和时间循环的状态传播比较"><table><caption>依据论文 §3；关键不在是否重复运行，而在状态沿哪条轴传播</caption><thead><tr><th scope="col">计算方式</th><th scope="col">增加了什么能力</th><th scope="col">仍需付出的代价或限制</th></tr></thead><tbody><tr><th scope="row">深度循环</th><td>重复共享层，增加处理当前上下文的有效深度。</td><td>固定 R 只扩大有限深度预算；不会自动把最终状态交给下一输入步。R 随任务增长可增加可处理的依赖深度，也会增加计算。</td></tr><tr><th scope="row">跨时间／块级循环</th><td>将处理上一输入步或上一块后形成的状态，传给下一步或下一块。</td><td>一般状态更新带来串行依赖；训练并行度、跨步信用分配与长期稳定性仍是问题。</td></tr><tr><th scope="row">文本 CoT／潜在反馈</th><td>把深层结果变成后续输入，使结果能重新进入浅层。</td><td>需要额外计算与可能的序列位置／缓存；潜在思考能否持续跟踪状态，取决于具体反馈路径，不能一概而论。</td></tr></tbody></table></div>
+        <p>因此，“自回归逐 token 生成”“在单次预测内部循环”和“跨输入传递潜在状态”不是同一个概念。主页面介绍的深度循环可以与时间循环结合，但<strong>参数共享本身并不保证存在跨时间的状态反馈</strong>。</p>
+        <h3>3. 不要把论点扩大成普遍不可能性</h3>
+        <ul><li><strong>不是 L 层只能处理 L 个 token。</strong>某些更新可以合并、并行计算，或通过历史回查、状态分解绕过逐步更新。论文讨论了部分任务可用随长度增长的 O(log n) 深度解决。</li><li><strong>长上下文与状态递推解决不同问题。</strong>更多历史可访问，不会凭空增加串行计算路径；但能从历史直接算出答案的任务可能受益。</li><li><strong>案例失败不是拓扑因果证明。</strong>对话错误还受训练与优化影响；可表示性、能否学到、实际运行成本也应分别评估。</li><li><strong>循环不是可靠性的保证。</strong>跨时间反馈支持状态传递，但仍可能遗忘、累积误差或训练不稳定。可并行的特殊状态更新也不等于完全没有状态能力。</li></ul>
+        <div class="callout"><b class="t">对本专题的补充</b>除了省权重与提升参数效率，循环还涉及“计算图是否适合持续更新状态”。这篇文章支持认真研究反馈路径，却不构成对所有 depth-loop 架构的统一背书，更不能据此认定某个闭源模型的实现。</div>
+        <h3>4. 开放问题：怎样把两种循环结合起来？</h3>
+        <p>下面是据此提出的评测建议，而非论文已验证的结果：在等训练／推理预算下，比较固定深度、可变深度循环、跨时间状态反馈和文本草稿；逐步增加状态更新链长度，测量长期一致性、长度外推、缓存增长、延迟与训练并行效率。重点是分辨“只是多算了几层”与“真正利用了可持续更新的状态”。</p>
+        <div class="source-links"><span class="source-title">原始材料</span><ul><li><a href="https://arxiv.org/abs/2604.17121" target="_blank" rel="noopener noreferrer">论文摘要与版本记录</a></li><li><a href="https://arxiv.org/html/2604.17121v2" target="_blank" rel="noopener noreferrer">固定版本全文：§2 限制与例子；§3 循环分类；§4 替代解释；§5 研究方向</a></li></ul></div>
+        <p><a href="index.html#reasoning">返回动机讨论 →</a> · <a href="mechanics.html#axes">补充 A：序列轴与深度轴 →</a></p>
+      </section>
+
+      <section id="distillation" class="section">
+        <div class="section-heading"><span class="section-number">B5 / DISTILLATION</span><h2>“降低可蒸馏性”应该是一个实验命题</h2></div>
+        <p><a href="https://arxiv.org/abs/1503.02531" target="_blank" rel="noopener noreferrer">Hinton、Vinyals、Dean（2015）</a>的知识蒸馏提供一个概念反例：学习教师输出分布，不需要读取教师的隐藏轨迹，也不要求学生同构。但这类软目标需要概率分布；如果 API 只返回文本，能做的是答案／序列监督，信息量不能混同。</p>
+        <div class="equation-card"><div class="equation">L<sub>soft</sub> = − E<sub>x</sub> ∑<sub>y</sub> p<sub>T</sub>(y | x) log p<sub>S</sub>(y | x)</div><p>这是输出分布蒸馏的标准概念式，非本次摘要页逐字公式。教师固定时，相当于最小化教师到学生的 KL 散度（差一个与学生无关的项）；不要求对教师反传。只拿到答案时，可用其作为目标序列，但不再是已知完整分布的监督。</p></div>
+        <p>因而“没有可读过程”不能推出“输出行为原则上不可迁移”。但也不能走向另一个极端：学生能否在有限数据和计算下学会长程算法，受输入覆盖、监督信息量、容量、可用深度和优化难度制约；训练分布内模仿成功也不保证分布外算法泛化。</p>
+        <h3>一个更有说服力的对照设计</h3>
+        <ol><li><strong>固定教师质量与查询集合：</strong>比较答案-only、答案 + 文字过程、允许时的 logits、可访问时的潜在轨迹。后两者不是一般闭源 API 的默认权限。</li><li><strong>按完整成本匹配：</strong>记录教师总计算／查询费用、监督 token 数，以及学生的训练 token 和 FLOPs；相同查询次数不一定等成本。</li><li><strong>比较多种学生：</strong>浅模型、独立深模型、循环模型；避免让缺乏足够计算深度的学生承担所有结果。</li><li><strong>评测算法与泛化：</strong>在未见任务长度、组合深度和新分布上测试，区分记住答案模式与学会求解器。</li><li><strong>加入产品控制组：</strong>普通 Transformer 隐藏内部 CoT，循环模型仍输出 CoT。由此区分架构效应与接口开放程度。</li></ol>
+        <div class="callout warn"><b class="t">目前只能给出的结论</b>减少可观察的过程监督可能提高模仿门槛；没有证据支持 looped 架构自带“无法有效蒸馏”的保证，也没有证据证明它是 OpenAI 采用该路线的商业原因。闭源竞争力也可能来自数据、训练成本、产品集成、分发和服务质量，不必把阻断蒸馏设为唯一必要条件。</div>
+        <p><a href="index.html#distillation">返回商业动机讨论 →</a></p>
+      </section>
+
+      <section id="checklist" class="section">
+        <div class="section-heading"><span class="section-number">B6 / EVALUATION CHECKLIST</span><h2>读到“更高效”，先问五件事</h2></div>
+        <div class="faq-list">
+          <details><summary>到底匹配了什么预算？</summary><p>参数、token、训练 FLOPs、推理 FLOPs、延迟和 KV 不能互相代替。最好同时给同数据与同算力两套结果。</p></details>
+          <details><summary>提升的是哪类能力？</summary><p>分别看困惑度、闭卷知识、开卷任务与多步推理；均值可能掩盖子任务退步。</p></details>
+          <details><summary>参数更少，有没有真正减少总显存？</summary><p>报告权重、优化器、激活、KV 与运行时占用，不把共享权重推断成共享缓存。</p></details>
+          <details><summary>省算术是否变成真实系统收益？</summary><p>在指定硬件与请求长度分布下测量吞吐、尾延迟、能耗；容量上限不是可交付的并发 SLA。</p></details>
+          <details><summary>因果证据还是一种合理解释？</summary><p>公开方法有效不代表某产品采用；CoT 更短不代表 looping 所致；难以读取轨迹也不代表难以学习输出行为。</p></details>
+        </div>
+      </section>
+      <nav class="back-card" aria-label="专题页间导航"><a href="index.html">← 返回 Looped Transformer 主页面</a><a href="mechanics.html">补充 A：原理与工程细节 →</a></nav>
+    </main>
+    <footer><span>LLM LEARNING NOTES / EVIDENCE & PAPERS</span><span>文献依据不等于产品架构确认</span><a href="#rumor">回到顶部 ↑</a></footer>
+  </div>
+</body>
+</html>

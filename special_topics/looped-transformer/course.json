@@ -1,0 +1,13 @@
+{
+  "$schema": "../../scripts/course.schema.json",
+  "title": "Looped Transformer · 动机、证据与开放问题",
+  "description": "参数共享、循环深度与显存收益，以及论文中的证据边界。",
+  "order": 20,
+  "published": true,
+  "entry": "index.html",
+  "supplements": [
+    { "title": "原理与工程细节", "path": "mechanics.html" },
+    { "title": "论文与证据边界", "path": "evidence.html" }
+  ],
+  "extra_files": ["fonts/OFL.txt"]
+}

@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "交互式教程目录信息",
+  "description": "放在 core_chapters/<目录>/ 或 special_topics/<目录>/course.json。正文保持 HTML，首页自动收录 published=true 的章节。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["title", "order", "published"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "title": {"type": "string", "minLength": 1, "description": "目录中显示的完整章节标题"},
+    "description": {"type": "string", "description": "可选的一句话简介"},
+    "order": {"type": "integer", "description": "同分类内按数字从小到大排列；相同数字按目录名排序"},
+    "published": {"type": "boolean", "description": "必须明确填写；false 时整章不进入发布产物。公开仓库中的草稿源码仍然可见"},
+    "entry": {"type": "string", "default": "index.html", "description": "教程目录内的 HTML 入口，不能带查询串、锚点、父目录或绝对路径"},
+    "supplements": {
+      "type": "array",
+      "default": [],
+      "description": "在章节下方显示的补充阅读，顺序与数组一致；文件自动发布",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["title", "path"],
+        "properties": {
+          "title": {"type": "string", "minLength": 1},
+          "path": {"type": "string", "description": "教程目录内 HTML 文件；允许如 notes.html#derivation 的锚点"}
+        }
+      }
+    },
+    "extra_files": {
+      "type": "array",
+      "default": [],
+      "description": "明确允许发布的额外文件，如 JS 的 fetch 数据、模块导入、Worker、下载文件及许可证；相对于教程目录，不支持通配符。HTML/CSS 静态引用的普通网页资产无需列出",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    }
+  }
+}
